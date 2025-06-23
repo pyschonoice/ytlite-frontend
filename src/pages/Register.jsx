@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { api } from "../services/api";
+import { api, getCurrentUser } from "../services/api";
 import { useState } from "react";
 import { Eye, EyeOff, UserPlus, Upload, X } from "lucide-react";
 
@@ -72,9 +72,8 @@ export default function Register() {
       const res = await api.post("/user/register", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const { user } = res.data.data;
-      login(user);
-      navigate("/");
+      // Reload the page to ensure cookies are set and user is authenticated
+      window.location.href = "/";
     } catch (err) {
       // Show backend validation errors if present
       if (err?.response?.data?.errors) {
