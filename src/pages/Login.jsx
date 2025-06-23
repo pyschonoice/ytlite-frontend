@@ -32,11 +32,15 @@ export default function Login() {
     setIsLoading(true);
     try {
       const res = await post("/user/login", data);
-      const { user, accessToken, refreshToken } = res.data;
-      login(user, { accessToken, refreshToken });
+      const { user } = res.data;
+      login(user);
       navigate("/");
     } catch (err) {
-      setError(err?.response?.data?.message || "Login failed");
+      if (err?.response?.data?.errors) {
+        setError(err.response.data.errors.map(e => e.msg).join(" | "));
+      } else {
+        setError(err?.response?.data?.message || "Login failed");
+      }
     } finally {
       setIsLoading(false);
     }

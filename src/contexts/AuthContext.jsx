@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { get } from "../services/api";
 
 const AuthContext = createContext();
 
@@ -6,21 +7,27 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Restore session from cookie on mount
   useEffect(() => {
-    // Optionally, fetch current user from API or localStorage
-    setIsLoading(false);
+    async function restoreSession() {
+      try {
+        const res = await get("/user/current-user");
+        setUser(res.data);
+      } catch (e) {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    restoreSession();
   }, []);
 
-  const login = (user, tokens) => {
+  const login = (user) => {
     setUser(user);
-    localStorage.setItem("accessToken", tokens.accessToken);
-    localStorage.setItem("refreshToken", tokens.refreshToken);
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
   };
 
   return (

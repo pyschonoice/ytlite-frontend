@@ -7,6 +7,7 @@ import Channel from "./pages/Channel";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import UploadVideo from "./pages/UploadVideo";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/upload" element={<UploadVideo />} />
             </Routes>
           </div>
         </main>

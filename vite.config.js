@@ -12,7 +12,6 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',
     watch: {
       usePolling: true, // Force polling instead of native events
       interval: 1000, // Poll every 1000ms (1 second)

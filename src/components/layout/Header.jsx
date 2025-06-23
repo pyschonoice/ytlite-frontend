@@ -1,15 +1,16 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import ThemeToggle from "../ui/ThemeToggle";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Plus } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
-    <header className="w-full h-16 flex items-center px-4 sm:px-6 border-b border-border bg-card text-card-foreground sticky top-0 z-50">
+    <header className="w-full h-16 flex items-center px-4 sm:px-6 border-b border-border bg-card text-card-foreground sticky top-0 z-50 overscroll-none">
       <div className="flex items-center justify-between w-full">
         {/* Logo */}
         <Link to="/" className="font-bold text-lg sm:text-xl tracking-tight hover:text-primary transition-colors">
@@ -18,6 +19,15 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-4">
+          {user && (
+            <button
+              onClick={() => navigate("/upload")}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Create
+            </button>
+          )}
           <ThemeToggle />
           {user ? (
             <div className="flex items-center gap-4">
@@ -51,6 +61,14 @@ export default function Header() {
 
         {/* Mobile Menu Button */}
         <div className="md:hidden flex items-center gap-2">
+          {user && (
+            <button
+              onClick={() => navigate("/upload")}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
           <ThemeToggle />
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -65,6 +83,18 @@ export default function Header() {
       {isMobileMenuOpen && (
         <div className="absolute top-16 left-0 right-0 bg-card border-b border-border md:hidden">
           <div className="px-4 py-4 space-y-4">
+            {user && (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  navigate("/upload");
+                }}
+                className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors w-full justify-center"
+              >
+                <Plus className="h-4 w-4" />
+                Create
+              </button>
+            )}
             {user ? (
               <>
                 <Link

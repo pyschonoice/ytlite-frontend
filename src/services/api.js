@@ -41,4 +41,9 @@ export async function get(url, params) {
 export async function post(url, data) {
   const res = await api.post(url, data);
   return res.data;
+}
+
+export async function getCurrentUser() {
+  const res = await api.get("/user/current-user");
+  return res.data;
 } 

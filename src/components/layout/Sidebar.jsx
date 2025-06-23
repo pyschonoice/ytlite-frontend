@@ -1,13 +1,15 @@
 import { Link } from "react-router-dom";
-import { Home, User, Video, TrendingUp, Clock, Heart } from "lucide-react";
+import { Home, User, TrendingUp, Clock, Heart } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function Sidebar() {
+  const { user } = useAuth();
   const navigationItems = [
-    { icon: Home, label: "Home", path: "/" },
-    { icon: TrendingUp, label: "Trending", path: "/trending" },
-    { icon: Clock, label: "History", path: "/history" },
-    { icon: Heart, label: "Liked", path: "/liked" },
-    { icon: User, label: "Profile", path: "/profile" },
+    { icon: Home, label: "Home", path: "/", always: true },
+    { icon: TrendingUp, label: "Trending", path: "/trending", always: true },
+    { icon: Clock, label: "History", path: "/history", auth: true },
+    { icon: Heart, label: "Liked", path: "/liked", auth: true },
+    { icon: User, label: "Profile", path: "/profile", auth: true },
   ];
 
   return (
@@ -15,6 +17,8 @@ export default function Sidebar() {
       <div className="p-4">
         <nav className="space-y-2">
           {navigationItems.map((item) => {
+            if (item.auth && !user) return null;
+            if (!item.auth && !item.always) return null;
             const Icon = item.icon;
             return (
               <Link

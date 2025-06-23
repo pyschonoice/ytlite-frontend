@@ -57,31 +57,31 @@ export default function Register() {
   const onSubmit = async (data) => {
     setError(null);
     setIsLoading(true);
-    
     try {
       const formData = new FormData();
       formData.append("fullName", data.fullName);
       formData.append("username", data.username);
       formData.append("email", data.email);
       formData.append("password", data.password);
-      
       if (data.avatar && data.avatar[0]) {
         formData.append("avatar", data.avatar[0]);
       }
-      
       if (data.coverImage && data.coverImage[0]) {
         formData.append("coverImage", data.coverImage[0]);
       }
-
       const res = await api.post("/user/register", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      
-      const { user, accessToken, refreshToken } = res.data.data;
-      login(user, { accessToken, refreshToken });
+      const { user } = res.data.data;
+      login(user);
       navigate("/");
     } catch (err) {
-      setError(err?.response?.data?.message || "Registration failed");
+      // Show backend validation errors if present
+      if (err?.response?.data?.errors) {
+        setError(err.response.data.errors.map(e => e.msg).join(" | "));
+      } else {
+        setError(err?.response?.data?.message || "Registration failed");
+      }
     } finally {
       setIsLoading(false);
     }
