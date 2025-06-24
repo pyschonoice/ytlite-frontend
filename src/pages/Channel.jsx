@@ -14,6 +14,7 @@ import { useAuth } from "../contexts/AuthContext";
 import ProfileBanner from "../components/ProfileBanner";
 import SortAndActionBar from "../components/SortAndActionBar";
 import { Video, List, Pencil } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const TABS = [
   { key: "videos", label: "Videos" },
@@ -30,6 +31,7 @@ export default function Channel() {
   const [videoSort, setVideoSort] = useState("desc");
   const [postSort, setPostSort] = useState("desc");
   const [playlistSort, setPlaylistSort] = useState("desc");
+  const navigate = useNavigate();
 
   const { data: channelData, isLoading: loadingChannel, isError: errorChannel } = useQuery({
     queryKey: ["channel", username],
@@ -132,7 +134,14 @@ export default function Channel() {
             <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {loadingPlaylists
                 ? Array.from({ length: 3 }).map((_, i) => <PlaylistCardSkeleton key={i} />)
-                : playlists.map((playlist) => <PlaylistCard key={playlist._id} playlist={playlist} />)}
+                : playlists.map((playlist) => (
+                    <PlaylistCard
+                      key={playlist._id}
+                      playlist={playlist}
+                      onClick={() => navigate(`/playlist/${playlist._id}`)}
+                      className="cursor-pointer"
+                    />
+                  ))}
             </div>
           </>
         )}

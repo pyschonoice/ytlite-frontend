@@ -39,6 +39,7 @@ export default function Playlists() {
   });
   const playlist = data?.data || {};
   const videos = playlist.videos || [];
+  const isOwner = user && playlist.owner && user._id === playlist.owner;
 
   const descLimit = 80;
   const isLongDesc = (playlist.description || "").length > descLimit;
@@ -122,16 +123,18 @@ export default function Playlists() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Button size="icon" variant="ghost" onClick={() => setEditMode(true)}><Pencil className="w-5 h-5" /></Button>
-              <Button size="icon" variant="destructive" onClick={() => setConfirmDelete(true)}><Trash2 className="w-5 h-5" /></Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setConfirmClear(true)}
-                disabled={clearMutation.isLoading || videos.length === 0}
-              >
-                Clear All
-              </Button>
+              {isOwner && <Button size="icon" variant="ghost" onClick={() => setEditMode(true)}><Pencil className="w-5 h-5" /></Button>}
+              {isOwner && <Button size="icon" variant="destructive" onClick={() => setConfirmDelete(true)}><Trash2 className="w-5 h-5" /></Button>}
+              {isOwner && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setConfirmClear(true)}
+                  disabled={clearMutation.isLoading || videos.length === 0}
+                >
+                  Clear All
+                </Button>
+              )}
             </div>
           </div>
 
@@ -171,7 +174,7 @@ export default function Playlists() {
               clearLoading={clearMutation.isLoading}
               confirmOpen={confirmClear}
               setConfirmOpen={setConfirmClear}
-              onRemove={videoId => removeMutation.mutate(videoId)}
+              {...(isOwner ? { onRemove: videoId => removeMutation.mutate(videoId) } : {})}
               emptyText="No videos in this playlist."
             />
           </div>

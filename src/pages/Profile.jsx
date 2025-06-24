@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { get } from "../services/api";
+import { createPlaylist } from "../services/playlistApi";
 import { useAuth } from "../contexts/AuthContext";
 import VideoCard from "../components/VideoCard";
 import VideoCardSkeleton from "../components/VideoCardSkeleton";
@@ -151,25 +152,16 @@ export default function Profile() {
               actionIcon={<List className="w-5 h-5" />}
               onAction={() => setShowCreateModal(true)}
             />
-            <div className="flex flex-col gap-6">
+            <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {playlistsData?.isLoading
                 ? Array.from({ length: 3 }).map((_, i) => <PlaylistCardSkeleton key={i} />)
                 : playlists.map((playlist) => (
-                  <button
+                  <PlaylistCard
                     key={playlist._id}
-                    type="button"
-                    onClick={e => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      navigate(`/playlist/${playlist._id}`);
-                    }}
-                    className="flex items-center gap-4 p-4 border border-border rounded-lg bg-card hover:shadow transition cursor-pointer w-full text-left"
-                  >
-                    <div className="flex-1">
-                      <div className="text-lg font-semibold text-card-foreground">{playlist.name}</div>
-                      
-                    </div>
-                  </button>
+                    playlist={playlist}
+                    onClick={() => navigate(`/playlist/${playlist._id}`)}
+                    className="cursor-pointer"
+                  />
                 ))}
             </div>
             <CreateEditPlaylistModal
@@ -178,7 +170,7 @@ export default function Profile() {
               onSubmit={({ name, description }) => {
                 setCreateLoading(true);
                 setCreateError("");
-                api.post("/playlist/", { name, description })
+                createPlaylist({ name, description })
                   .then(() => {
                     setShowCreateModal(false);
                     setCreateLoading(false);
