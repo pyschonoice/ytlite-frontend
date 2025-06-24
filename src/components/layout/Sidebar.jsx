@@ -28,7 +28,7 @@ export default function Sidebar({ collapsed, isMobileOpen, onCloseMobile }) {
           "flex flex-col border-r border-border bg-sidebar text-sidebar-foreground transition-all duration-200 z-40",
           // Desktop behavior (sticky, pushes content)
           "hidden lg:flex sticky top-16 h-[calc(100vh-4rem)]", // Fixed height, starts below header
-          collapsed ? "w-20" : "w-64",
+          collapsed ? "w-20" : "w-52",
           // Mobile behavior (fixed, overlays content)
           isMobileOpen
             ? "left-0 fixed top-0 h-full" // Visible fixed overlay

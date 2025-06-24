@@ -25,7 +25,6 @@ export default function Home() {
 
   return (
     <div className="py-8 px-4 max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8 text-card-foreground">All Videos</h1>
       {isLoading && <div className="text-muted-foreground">Loading videos...</div>}
       {isError && <div className="text-destructive">Failed to load videos.</div>}
       <div className="grid gap-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">

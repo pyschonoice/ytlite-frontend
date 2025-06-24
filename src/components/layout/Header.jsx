@@ -1,9 +1,11 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import ThemeToggle from "../ui/ThemeToggle";
-import { Menu, X, Plus } from "lucide-react";
+import { Menu, X, Plus, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
+
+const AVATAR_PLACEHOLDER = "https://ui-avatars.com/api/?name=User&background=888&color=fff&rounded=true";
 
 export default function Header({
   onToggleSidebar,
@@ -19,6 +21,9 @@ export default function Header({
   useEffect(() => {
     setIsMobileDropdownOpen(false);
   }, [location.pathname]);
+
+  const avatarUrl = user?.avatar?.url || AVATAR_PLACEHOLDER;
+  const avatarLink = user ? "/profile" : "/login";
 
   return (
     <header className="w-full h-16 flex items-center px-4 sm:px-6 border-b border-border bg-card text-card-foreground sticky top-0 z-50 overscroll-none">
@@ -76,10 +81,14 @@ export default function Header({
           {user ? (
             <div className="flex items-center gap-4">
               <Link
-                to="/profile"
-                className="text-sm hover:text-primary transition-colors"
+                to={avatarLink}
+                className="flex items-center"
               >
-                {user.fullName}
+                <img
+                  src={avatarUrl}
+                  alt={user.fullName || user.username || "User"}
+                  className="w-9 h-9 rounded-full object-cover border border-border bg-muted"
+                />
               </Link>
               <button
                 onClick={logout}
@@ -149,11 +158,15 @@ export default function Header({
             {user ? (
               <>
                 <Link
-                  to="/profile"
-                  className="block text-sm hover:text-primary transition-colors"
+                  to={avatarLink}
+                  className="flex items-center gap-2"
                   onClick={() => setIsMobileDropdownOpen(false)}
                 >
-                  {user.fullName}
+                  <img
+                    src={avatarUrl}
+                    alt={user.fullName || user.username || "User"}
+                    className="w-8 h-8 rounded-full object-cover border border-border bg-muted"
+                  />
                 </Link>
                 <button
                   onClick={() => {

@@ -87,9 +87,9 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-card rounded-lg shadow-lg border border-border p-6 sm:p-8">
+    <div className="min-h-full flex items-center justify-center bg-background overflow-none m-0 p-0 ">
+      <div className="w-full max-w-xl ">
+        <div className="bg-card rounded-lg shadow-lg border border-border p-6 sm:p-10">
           <div className="text-center mb-6">
             <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
               <UserPlus className="h-6 w-6 text-primary" />
@@ -168,66 +168,49 @@ export default function Register() {
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-card-foreground mb-2">
-                Avatar *
-              </label>
-              <div className="space-y-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  {...register("avatar")}
-                  className="w-full px-3 py-2 border border-border rounded-md bg-input text-input-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                />
-                {avatarPreview && (
-                  <div className="relative inline-block">
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar preview"
-                      className="w-16 h-16 rounded-full object-cover border border-border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setAvatarPreview(null)}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
+            {/* Avatar and Cover Image Selectors Side by Side */}
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Avatar Selector */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-card-foreground mb-2">Avatar <span className="text-destructive">*</span></label>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-md bg-input cursor-pointer transition-colors hover:border-primary min-h-[140px] w-full p-4">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Avatar preview" className="w-20 h-20 object-cover rounded-full border border-border mb-2" />
+                  ) : (
+                    <>
+                      <UserPlus className="h-10 w-10 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">Drag & drop or click to select avatar</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    {...register("avatar")}
+                    className="hidden"
+                  />
+                </label>
+                {errors.avatar && <p className="mt-1 text-sm text-destructive">{errors.avatar.message}</p>}
               </div>
-              {errors.avatar && (
-                <p className="mt-1 text-sm text-destructive">{errors.avatar.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-card-foreground mb-2">
-                Cover Image (optional)
-              </label>
-              <div className="space-y-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  {...register("coverImage")}
-                  className="w-full px-3 py-2 border border-border rounded-md bg-input text-input-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
-                />
-                {coverPreview && (
-                  <div className="relative inline-block">
-                    <img
-                      src={coverPreview}
-                      alt="Cover preview"
-                      className="w-24 h-16 rounded-md object-cover border border-border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setCoverPreview(null)}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
+              {/* Cover Image Selector */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-card-foreground mb-2">Cover Image</label>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-md bg-input cursor-pointer transition-colors hover:border-primary min-h-[140px] w-full p-4">
+                  {coverPreview ? (
+                    <img src={coverPreview} alt="Cover preview" className="w-full h-20 object-cover rounded mb-2" />
+                  ) : (
+                    <>
+                      <Upload className="h-10 w-10 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">Drag & drop or click to select cover image</span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    {...register("coverImage")}
+                    className="hidden"
+                  />
+                </label>
+                {errors.coverImage && <p className="mt-1 text-sm text-destructive">{errors.coverImage.message}</p>}
               </div>
             </div>
 
