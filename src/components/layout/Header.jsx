@@ -1,21 +1,65 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import ThemeToggle from "../ui/ThemeToggle";
 import { Menu, X, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Button } from "../ui/button";
 
-export default function Header() {
+export default function Header({
+  onToggleSidebar,
+  onToggleMobileSidebar,
+  sidebarCollapsed,
+  isSidebarToggleDisabled = false, // New prop with default value
+}) {
   const { user, logout } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileDropdownOpen, setIsMobileDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    setIsMobileDropdownOpen(false);
+  }, [location.pathname]);
 
   return (
     <header className="w-full h-16 flex items-center px-4 sm:px-6 border-b border-border bg-card text-card-foreground sticky top-0 z-50 overscroll-none">
       <div className="flex items-center justify-between w-full">
-        {/* Logo */}
-        <Link to="/" className="font-bold text-lg sm:text-xl tracking-tight hover:text-primary transition-colors">
-          ytlite
-        </Link>
+        <div className="flex items-center gap-2">
+          {/* Mobile Sidebar Toggle Button (visible below lg breakpoint) */}
+          <div className="lg:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Toggle mobile sidebar"
+              onClick={onToggleMobileSidebar}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Desktop Sidebar Toggle Button (visible only on lg breakpoint and above) */}
+          <div className="hidden lg:block">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={
+                sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+              }
+              onClick={onToggleSidebar}
+              disabled={isSidebarToggleDisabled} // Disable the button here
+              className={isSidebarToggleDisabled ? "opacity-50 cursor-not-allowed" : ""} // Visual feedback
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Logo */}
+          <Link
+            to="/"
+            className="font-bold text-lg sm:text-xl tracking-tight hover:text-primary transition-colors"
+          >
+            ytlite
+          </Link>
+        </div>
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-4">
@@ -31,7 +75,10 @@ export default function Header() {
           <ThemeToggle />
           {user ? (
             <div className="flex items-center gap-4">
-              <Link to="/profile" className="text-sm hover:text-primary transition-colors">
+              <Link
+                to="/profile"
+                className="text-sm hover:text-primary transition-colors"
+              >
                 {user.fullName}
               </Link>
               <button
@@ -59,7 +106,7 @@ export default function Header() {
           )}
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Button (for the dropdown) */}
         <div className="md:hidden flex items-center gap-2">
           {user && (
             <button
@@ -71,22 +118,26 @@ export default function Header() {
           )}
           <ThemeToggle />
           <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            onClick={() => setIsMobileDropdownOpen((open) => !open)}
             className="p-2 hover:bg-accent rounded-md transition-colors"
           >
-            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {isMobileDropdownOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="absolute top-16 left-0 right-0 bg-card border-b border-border md:hidden">
+      {/* Mobile Dropdown Menu */}
+      {isMobileDropdownOpen && (
+        <div className="absolute top-16 left-0 right-0 bg-card border-b border-border md:hidden animate-in slide-in-from-top-2 fade-in-80">
           <div className="px-4 py-4 space-y-4">
             {user && (
               <button
                 onClick={() => {
-                  setIsMobileMenuOpen(false);
+                  setIsMobileDropdownOpen(false);
                   navigate("/upload");
                 }}
                 className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors w-full justify-center"
@@ -100,14 +151,14 @@ export default function Header() {
                 <Link
                   to="/profile"
                   className="block text-sm hover:text-primary transition-colors"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => setIsMobileDropdownOpen(false)}
                 >
                   {user.fullName}
                 </Link>
                 <button
                   onClick={() => {
                     logout();
-                    setIsMobileMenuOpen(false);
+                    setIsMobileDropdownOpen(false);
                   }}
                   className="block text-sm hover:text-destructive transition-colors"
                 >
@@ -119,14 +170,14 @@ export default function Header() {
                 <Link
                   to="/login"
                   className="block text-sm hover:text-primary transition-colors"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => setIsMobileDropdownOpen(false)}
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
                   className="block bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm hover:bg-primary/90 transition-colors text-center"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={() => setIsMobileDropdownOpen(false)}
                 >
                   Register
                 </Link>
@@ -137,4 +188,4 @@ export default function Header() {
       )}
     </header>
   );
-} 
+}
