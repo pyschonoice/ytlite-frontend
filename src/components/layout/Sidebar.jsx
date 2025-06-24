@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Home, User, TrendingUp, Clock, Heart } from "lucide-react";
+import { Home, User, TrendingUp, Clock, Heart, List } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { cn } from "../../lib/utils";
 

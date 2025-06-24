@@ -10,6 +10,8 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import UploadVideo from "./pages/UploadVideo";
 import History from "./pages/History";
+import Liked from "./pages/Liked";
+import Playlists from "./pages/Playlists";
 
 export default function App() {
   const location = useLocation();
@@ -67,6 +69,8 @@ export default function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/upload" element={<UploadVideo />} />
               <Route path="/history" element={<History />} />
+              <Route path="/liked" element={<Liked />} />
+              <Route path="/playlist/:playlistId" element={<Playlists />} />
             </Routes>
           
         </main>

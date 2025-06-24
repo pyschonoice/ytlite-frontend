@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { get } from "../services/api";
 import VideoCard from "../components/VideoCard";
+import VideoCardSkeleton from "../components/VideoCardSkeleton";
 
 export default function Home() {
   const {
@@ -25,7 +26,11 @@ export default function Home() {
 
   return (
     <div className="py-8 px-4 max-w-7xl mx-auto">
-      {isLoading && <div className="text-muted-foreground">Loading videos...</div>}
+      {isLoading && (
+        <div className="grid gap-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => <VideoCardSkeleton key={i} />)}
+        </div>
+      )}
       {isError && <div className="text-destructive">Failed to load videos.</div>}
       <div className="grid gap-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
         {videos.map((video) => (

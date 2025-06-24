@@ -3,13 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, api } from "../services/api";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { Bell, ThumbsUp } from "lucide-react";
-
-function formatNumber(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
-  return n;
-}
+import { Bell, ThumbsUp, Plus } from "lucide-react";
+import Avatar from "../components/ui/Avatar";
+import AvatarSkeleton from "../components/ui/AvatarSkeleton";
+import { formatNumber, formatTimeAgo } from "../lib/utils";
+import PlaylistModal from "../components/PlaylistModal";
 
 function CommentList({ videoId }) {
   const { data, isLoading, isError } = useQuery({
@@ -29,11 +27,7 @@ function CommentList({ videoId }) {
       )}
       {comments.map((c) => (
         <div key={c._id} className="flex gap-3 items-start">
-          <img
-            src={c.ownerDetails?.avatar?.url}
-            alt="avatar"
-            className="w-8 h-8 rounded-full object-cover border border-border"
-          />
+          <Avatar user={c.ownerDetails} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="font-medium text-card-foreground break-words">
               {c.ownerDetails?.fullName || c.ownerDetails?.username}
@@ -102,6 +96,7 @@ export default function Video() {
   const [subscribed, setSubscribed] = useState(false);
   const [subscriberCount, setSubscriberCount] = useState(0);
   const hasIncremented = useRef(false);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
 
   const { data, isLoading, isError, refetch: refetchVideoDetails } = useQuery({
     queryKey: ["video", id],
@@ -132,22 +127,36 @@ export default function Video() {
 
   const likeMutation = useMutation({
     mutationFn: () => api.post(`/like/toggle/v/${id}`),
+    onMutate: async () => {
+      setLiked((prev) => !prev);
+      setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+    },
     onSuccess: () => {
       refetchVideoDetails();
       queryClient.invalidateQueries(["video", id]);
     },
     onError: (err) => {
+      // Rollback
+      setLiked((prev) => !prev);
+      setLikeCount((prev) => (liked ? prev + 1 : prev - 1));
       console.error("Like mutation failed:", err);
     },
   });
 
   const subscribeMutation = useMutation({
     mutationFn: () => api.post(`/subscribe/c/${channelUsername}`),
+    onMutate: async () => {
+      setSubscribed((prev) => !prev);
+      setSubscriberCount((prev) => (subscribed ? prev - 1 : prev + 1));
+    },
     onSuccess: () => {
       refetchChannelInfo();
       queryClient.invalidateQueries(["channelInfo", channelUsername]);
     },
     onError: (err) => {
+      // Rollback
+      setSubscribed((prev) => !prev);
+      setSubscriberCount((prev) => (subscribed ? prev + 1 : prev - 1));
       console.error("Subscribe mutation failed:", err);
     },
   });
@@ -197,11 +206,7 @@ export default function Video() {
                 to={`/channel/${video.owner?.username || video.owner?._id}`}
                 className="flex items-center gap-2"
               >
-                <img
-                  src={video.owner?.avatar?.url}
-                  alt={video.owner?.fullName}
-                  className="w-12 h-12 rounded-full object-cover border border-border"
-                />
+                <Avatar user={video.owner} size="lg" />
                 <span className="font-semibold text-card-foreground text-xl flex items-center gap-1">
                   {video.owner?.fullName || video.owner?.username}
                 </span>
@@ -224,6 +229,7 @@ export default function Video() {
                   disabled={subscribeMutation.isLoading}
                 >
                   <Bell className="w-5 h-5" />
+                  {subscribeMutation.isLoading && <span className="loader w-3 h-3 ml-1" />}
                   {subscribed ? "Subscribed" : "Subscribe"}
                 </button>
               )}
@@ -241,14 +247,22 @@ export default function Video() {
                 disabled={likeMutation.isLoading}
               >
                 <ThumbsUp className="w-5 h-5" />
+                {likeMutation.isLoading && <span className="loader w-3 h-3 ml-1" />}
                 {formatNumber(likeCount)}
+              </button>
+              <button
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted hover:bg-primary/10 text-primary font-semibold transition-colors"
+                onClick={() => setShowPlaylistModal(true)}
+              >
+                <Plus className="w-5 h-5" />
+                Save to playlist
               </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-muted-foreground text-lg mb-4">
             <span>{formatNumber(video.views)} views</span>
             <span>•</span>
-            <span>{new Date(video.createdAt).toLocaleDateString()}</span>
+            <span>{formatTimeAgo(video.createdAt)}</span>
           </div>
           <div className="mb-6 text-card-foreground whitespace-pre-line text-lg">
             {video.description}
@@ -265,6 +279,8 @@ export default function Video() {
           </div>
         </div>
       </div>
+      {/* Playlist Modal */}
+      <PlaylistModal open={showPlaylistModal} onClose={() => setShowPlaylistModal(false)} videoId={video._id} userId={user?._id} />
     </div>
   );
 }

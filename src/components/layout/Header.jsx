@@ -74,7 +74,7 @@ export default function Header({
               className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors"
             >
               <Plus className="h-4 w-4" />
-              Create
+              Upload
             </button>
           )}
           <ThemeToggle />
