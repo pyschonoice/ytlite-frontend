@@ -45,22 +45,27 @@ export default function Channel() {
   const { username } = useParams();
   const { user } = useAuth();
   const [tab, setTab] = useState("videos");
+
   const { data: channelData, isLoading: loadingChannel, isError: errorChannel } = useQuery({
     queryKey: ["channel", username],
     queryFn: () => get(`/user/c/${username}`),
     enabled: !!username,
   });
-  const channelId = channelData?.data?._id;
+
+  const channelId = channelData?.data?.channel?._id; // Corrected access for channelId
+
   const { data: videosData, isLoading: loadingVideos, isError: errorVideos } = useQuery({
     queryKey: ["channelVideos", username],
     queryFn: () => get(`/dashboard/videos/${channelId}`),
     enabled: !!channelId,
   });
+
   const { data: tweetsData, isLoading: loadingTweets, isError: errorTweets } = useQuery({
     queryKey: ["channelTweets", username],
     queryFn: () => get(`/tweet/c/${username}`),
     enabled: !!username,
   });
+
   const { data: playlistsData, isLoading: loadingPlaylists, isError: errorPlaylists } = useQuery({
     queryKey: ["channelPlaylists", channelId],
     queryFn: () => get(`/playlist/user/${channelId}`),
@@ -68,12 +73,13 @@ export default function Channel() {
   });
 
   if (loadingChannel) return <div className="text-muted-foreground">Loading channel...</div>;
-  if (errorChannel || !channelData?.data) return <div className="text-destructive">Channel not found.</div>;
+  if (errorChannel || !channelData?.data?.channel) return <div className="text-destructive">Channel not found.</div>; // Corrected check
 
-  const channel = channelData.data;
-  const videos = videosData?.data || [];
-  const tweets = tweetsData?.data?.tweets || tweetsData?.data || [];
-  const playlists = playlistsData?.data?.playlists || playlistsData?.data || [];
+  const channel = channelData.data.channel; // Corrected access
+  const videos = videosData?.data?.videos || []; // Corrected access
+  const tweets = tweetsData?.data?.tweets || []; // Corrected access
+  const playlists = playlistsData?.data?.playlists || []; // Corrected access
+
   const isOwnChannel = user && channel.username === user.username;
   const avatarUrl = channel.avatar?.url || AVATAR_PLACEHOLDER;
   const avatarLink = isOwnChannel ? "/profile" : `/channel/${channel.username}`;
@@ -110,7 +116,7 @@ export default function Channel() {
                 {channel.fullName || channel.username}
               </div>
               <div className="text-muted-foreground text-lg font-medium">@{channel.username}</div>
-              <div className="text-muted-foreground text-sm mt-1">{channel.subscribers?.length || 0} subscribers • {videos.length} videos</div>
+              <div className="text-muted-foreground text-sm mt-1">{channel.subscribersCount || 0} subscribers • {videos.length} videos</div>
               {channel.email && <div className="text-muted-foreground text-sm mt-1">{channel.email}</div>}
               {channel.bio && <div className="text-muted-foreground text-sm mt-1">{channel.bio}</div>}
             </div>
@@ -166,4 +172,4 @@ export default function Channel() {
       </div>
     </div>
   );
-} 
+}
