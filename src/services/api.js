@@ -46,4 +46,10 @@ export async function post(url, data) {
 export async function getCurrentUser() {
   const res = await api.get("/user/current-user");
   return res.data;
+}
+
+// Toggle subscription for a channel by username
+export async function toggleSubscription(username) {
+  const res = await api.post(`/subscribe/c/${username}`);
+  return res.data;
 } 

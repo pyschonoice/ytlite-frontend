@@ -95,7 +95,6 @@ export default function Profile() {
         userDataLoading={userData?.isLoading}
         subscribersCount={subscribers.length}
         videosCount={videos.length}
-        rightContent={<button className="bg-primary text-primary-foreground px-6 py-2 rounded-full font-semibold text-lg shadow hover:bg-primary/90 transition-colors">Subscribed</button>}
       />
       {/* Tabs */}
       <div className="mb-6 border-b border-border flex gap-6 px-6 overflow-x-auto">

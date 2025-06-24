@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { get } from "../services/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { get, toggleSubscription } from "../services/api";
 import Avatar from "../components/ui/Avatar";
 import AvatarSkeleton from "../components/ui/AvatarSkeleton";
 import VideoCard from "../components/VideoCard";
@@ -26,50 +26,68 @@ const AVATAR_PLACEHOLDER = "https://ui-avatars.com/api/?name=User&background=888
 
 export default function Channel() {
   const { username } = useParams();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // All hooks must be called unconditionally at the top level
+  const { user } = useAuth(); // Call useAuth first
   const [tab, setTab] = useState("videos");
   const [videoSort, setVideoSort] = useState("desc");
   const [postSort, setPostSort] = useState("desc");
   const [playlistSort, setPlaylistSort] = useState("desc");
-  const navigate = useNavigate();
+  const [subLoading, setSubLoading] = useState(false);
 
+  // Fetch channel data
   const { data: channelData, isLoading: loadingChannel, isError: errorChannel } = useQuery({
     queryKey: ["channel", username],
     queryFn: () => get(`/user/c/${username}`),
     enabled: !!username,
   });
 
-  const channelId = channelData?.data?.channel?._id; // Corrected access for channelId
+  const channelId = channelData?.data?.channel?._id;
 
+  // Fetch videos for the channel
   const { data: videosData, isLoading: loadingVideos, isError: errorVideos } = useQuery({
     queryKey: ["channelVideos", username, videoSort],
     queryFn: () => get(`/dashboard/videos/${channelId}?sortBy=createdAt&sortType=${videoSort}`),
-    enabled: !!channelId,
+    enabled: !!channelId, // Only enable if channelId is available
   });
 
+  // Fetch tweets for the channel
   const { data: tweetsData, isLoading: loadingTweets, isError: errorTweets } = useQuery({
     queryKey: ["channelTweets", username, postSort],
     queryFn: () => get(`/tweet/c/${username}?sortBy=createdAt&sortType=${postSort}`),
-    enabled: !!username,
+    enabled: !!username, // Can enable with just username
   });
 
+  // Fetch playlists for the channel
   const { data: playlistsData, isLoading: loadingPlaylists, isError: errorPlaylists } = useQuery({
     queryKey: ["channelPlaylists", channelId, playlistSort],
     queryFn: () => get(`/playlist/user/${channelId}?sortBy=createdAt&sortType=${playlistSort}`),
-
-    enabled: !!channelId,
+    enabled: !!channelId, // Only enable if channelId is available
   });
 
+  // Subscribe/Unsubscribe mutation
+  const subscribeMutation = useMutation({
+    mutationFn: () => toggleSubscription(channel.username),
+    onMutate: () => setSubLoading(true),
+    onSettled: () => setSubLoading(false),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["channel", username]);
+    },
+  });
+
+  // Early returns after all hooks have been called
   if (loadingChannel) return <div className="text-muted-foreground">Loading channel...</div>;
-  if (errorChannel || !channelData?.data?.channel) return <div className="text-destructive">Channel not found.</div>; // Corrected check
+  if (errorChannel || !channelData?.data?.channel) return <div className="text-destructive">Channel not found.</div>;
 
-  const channel = channelData.data.channel; // Corrected access
-  const videos = videosData?.data?.videos || []; // Corrected access
-  const tweets = tweetsData?.data?.tweets || []; // Corrected access
-  const playlists = playlistsData?.data?.playlists || []; // Corrected access
-
+  const channel = channelData.data.channel;
+  const videos = videosData?.data?.videos || [];
+  const tweets = tweetsData?.data?.tweets || [];
+  const playlists = playlistsData?.data?.playlists || [];
 
   const isOwnChannel = user && channel.username === user.username;
+  const isSubscribed = channel.isSubscribed;
   const avatarUrl = channel.avatar?.url || AVATAR_PLACEHOLDER;
   const avatarLink = isOwnChannel ? "/profile" : `/channel/${channel.username}`;
 
@@ -82,7 +100,15 @@ export default function Channel() {
         subscribersCount={channel.subscribersCount || 0}
         videosCount={videos.length}
         rightContent={!isOwnChannel && (
-          <button className="bg-primary text-primary-foreground px-6 py-2 rounded-full font-semibold text-lg shadow hover:bg-primary/90 transition-colors">Subscribe</button>
+          <button
+            className={`bg-primary text-primary-foreground px-6 py-2 rounded-full font-semibold text-lg shadow hover:bg-primary/90 transition-colors flex items-center gap-2 ${subLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+            disabled={subLoading}
+            onClick={() => subscribeMutation.mutate()}
+          >
+            {subLoading ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+            ) : isSubscribed ? 'Subscribed' : 'Subscribe'}
+          </button>
         )}
       />
       {/* Tabs */}
