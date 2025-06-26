@@ -6,9 +6,12 @@ import App from "./App";
 import "./index.css";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
-import { inject } from '@vercel/analytics';
+
 const queryClient = new QueryClient();
-inject();
+if (typeof window !== "undefined") {
+  import('@vercel/analytics').then(({ inject }) => inject());
+}
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ThemeProvider>
