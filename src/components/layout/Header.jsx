@@ -63,8 +63,9 @@ export default function Header({
           {/* Logo */}
           <Link
             to="/"
-            className="font-bold text-lg sm:text-xl tracking-tight hover:text-primary transition-colors"
+            className="font-bold text-lg sm:text-xl tracking-tight hover:text-primary transition-colors flex gap-2 items-center justify-between"
           >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-square-play-icon lucide-square-play"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 8 6 4-6 4Z"/></svg>
             ytlite
           </Link>
         </div>
