@@ -1,7 +1,6 @@
-// src/contexts/AuthContext.jsx
+
 import { createContext, useContext, useState, useEffect } from "react";
-// Assuming getCurrentUser is a function that makes an API call to get the current user
-// and api is your axios instance.
+
 import { getCurrentUser, api } from "../services/api";
 
 const AuthContext = createContext();
