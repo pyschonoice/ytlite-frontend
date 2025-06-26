@@ -190,15 +190,7 @@ export default function UploadVideo() {
               {errors.thumbnail && <p className="mt-1 text-sm text-destructive">{errors.thumbnail.message}</p>}
             </div>
           </div>
-          {/* Add to your playlists (placeholder) */}
-          <div>
-            <label className="block text-sm font-medium text-card-foreground mb-2">
-              Add to your playlists
-            </label>
-            <div className="w-full px-3 py-2 border border-dashed border-border rounded-md bg-muted text-muted-foreground text-center">
-              (Coming soon)
-            </div>
-          </div>
+          
           {/* Error/Success */}
           {error && <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-destructive">{error}</div>}
           {success && <div className="p-3 bg-primary/10 border border-primary/20 rounded-md text-primary">{success}</div>}

@@ -35,7 +35,7 @@ export default function Sidebar({ collapsed, isMobileOpen, onCloseMobile }) {
             : "-left-full lg:left-auto" // Hidden on mobile, auto-position on desktop
         )}
       >
-        <nav className="space-y-2 flex-1 p-2 mt-0 overflow-y-auto custom-scrollbar">
+        <nav className="space-y-2 flex-1 p-4 mt-0 overflow-y-auto custom-scrollbar">
           {navigationItems.map((item) => {
             if (item.auth && !user) return null;
             if (!item.auth && !item.always) return null;
