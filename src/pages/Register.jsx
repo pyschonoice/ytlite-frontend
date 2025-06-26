@@ -1,18 +1,19 @@
+// src/pages/Register.jsx
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { api, getCurrentUser } from "../services/api";
-import { useState } from "react";
-import { Eye, EyeOff, UserPlus, Upload, X } from "lucide-react";
+import { api } from "../services/api";
+import { useState, useEffect } from "react"; // <-- Import useEffect
+import { Eye, EyeOff, UserPlus, Upload } from "lucide-react";
 
 const registerSchema = z.object({
   fullName: z.string().min(1, "Full name is required"),
   username: z.string().min(1, "Username is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  avatar: z.any(),
+  avatar: z.any().refine(files => files?.length > 0, "Avatar is required."), // Make avatar required
   coverImage: z.any().optional(),
 });
 
@@ -37,20 +38,27 @@ export default function Register() {
   const avatarFile = watch("avatar");
   const coverFile = watch("coverImage");
 
-  // Handle file previews
-  useState(() => {
+  // --- FIX: Changed useState to useEffect ---
+  // This effect runs whenever the 'avatarFile' (from react-hook-form) changes.
+  useEffect(() => {
     if (avatarFile && avatarFile[0]) {
       const reader = new FileReader();
-      reader.onload = (e) => setAvatarPreview(e.target.result);
+      reader.onload = (e) => setAvatarPreview(e.target.result); // Set the preview state when file is read
       reader.readAsDataURL(avatarFile[0]);
+    } else {
+      setAvatarPreview(null); // Clear preview if no file is selected
     }
   }, [avatarFile]);
 
-  useState(() => {
+  // --- FIX: Changed useState to useEffect ---
+  // This effect runs whenever the 'coverFile' changes.
+  useEffect(() => {
     if (coverFile && coverFile[0]) {
       const reader = new FileReader();
       reader.onload = (e) => setCoverPreview(e.target.result);
       reader.readAsDataURL(coverFile[0]);
+    } else {
+      setCoverPreview(null); // Clear preview if no file is selected
     }
   }, [coverFile]);
 
@@ -72,7 +80,11 @@ export default function Register() {
       const res = await api.post("/user/register", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      // Reload the page to ensure cookies are set and user is authenticated
+
+      // After successful registration, the backend should ideally log the user in
+      // and set the cookies. A hard refresh forces the AuthContext to re-check for the user.
+      // A smoother alternative would be to call login() from AuthContext and then navigate.
+      // For now, this works.
       window.location.href = "/";
     } catch (err) {
       // Show backend validation errors if present
@@ -254,4 +266,4 @@ export default function Register() {
       </div>
     </div>
   );
-} 
+}

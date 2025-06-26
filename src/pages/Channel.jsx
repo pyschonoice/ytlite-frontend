@@ -1,3 +1,4 @@
+// src/pages/Channel.jsx
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, toggleSubscription } from "../services/api";
@@ -5,16 +6,18 @@ import Avatar from "../components/ui/Avatar";
 import AvatarSkeleton from "../components/ui/AvatarSkeleton";
 import VideoCard from "../components/VideoCard";
 import VideoCardSkeleton from "../components/VideoCardSkeleton";
-import PlaylistCard from "../components/PlaylistCard";
+// import PlaylistCard from "../components/PlaylistCard"; // No longer needed for display
 import PlaylistCardSkeleton from "../components/PlaylistCardSkeleton";
-import TweetCard from "../components/TweetCard";
+// import TweetCard from "../components/TweetCard"; // No longer needed for display
 import TweetCardSkeleton from "../components/TweetCardSkeleton";
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import ProfileBanner from "../components/ProfileBanner";
 import SortAndActionBar from "../components/SortAndActionBar";
-import { Video, List, Pencil } from "lucide-react";
+import { Video, List, Pencil } from "lucide-react"; // Pencil not directly used for posts action on channel
 import { useNavigate } from "react-router-dom";
+import TweetListDisplay from "../components/TweetListDisplay"; // <-- NEW: For Posts tab
+import PlaylistListDisplay from "../components/PlaylistListDisplay"; // <-- NEW: For Playlists tab
 
 const TABS = [
   { key: "videos", label: "Videos" },
@@ -30,7 +33,7 @@ export default function Channel() {
   const queryClient = useQueryClient();
 
   // All hooks must be called unconditionally at the top level
-  const { user } = useAuth(); // Call useAuth first
+  const { user } = useAuth();
   const [tab, setTab] = useState("videos");
   const [videoSort, setVideoSort] = useState("desc");
   const [postSort, setPostSort] = useState("desc");
@@ -50,21 +53,31 @@ export default function Channel() {
   const { data: videosData, isLoading: loadingVideos, isError: errorVideos } = useQuery({
     queryKey: ["channelVideos", username, videoSort],
     queryFn: () => get(`/dashboard/videos/${channelId}?sortBy=createdAt&sortType=${videoSort}`),
-    enabled: !!channelId, // Only enable if channelId is available
+    enabled: !!channelId,
   });
 
   // Fetch tweets for the channel
-  const { data: tweetsData, isLoading: loadingTweets, isError: errorTweets } = useQuery({
+  const {
+    data: tweetsData,
+    isLoading: loadingTweets,
+    isError: errorTweets,
+    error: tweetsFetchError, // Capture specific error object
+  } = useQuery({
     queryKey: ["channelTweets", username, postSort],
     queryFn: () => get(`/tweet/c/${username}?sortBy=createdAt&sortType=${postSort}`),
-    enabled: !!username, // Can enable with just username
+    enabled: !!username,
   });
 
   // Fetch playlists for the channel
-  const { data: playlistsData, isLoading: loadingPlaylists, isError: errorPlaylists } = useQuery({
+  const {
+    data: playlistsData,
+    isLoading: loadingPlaylists,
+    isError: errorPlaylists,
+    error: playlistsFetchError, // Capture specific error object
+  } = useQuery({
     queryKey: ["channelPlaylists", channelId, playlistSort],
     queryFn: () => get(`/playlist/user/${channelId}?sortBy=createdAt&sortType=${playlistSort}`),
-    enabled: !!channelId, // Only enable if channelId is available
+    enabled: !!channelId,
   });
 
   // Subscribe/Unsubscribe mutation
@@ -75,21 +88,33 @@ export default function Channel() {
     onSuccess: () => {
       queryClient.invalidateQueries(["channel", username]);
     },
+    onError: (err) => {
+      console.error("Subscription toggle failed:", err);
+      // Optionally show a toast or error message here
+    }
   });
 
   // Early returns after all hooks have been called
-  if (loadingChannel) return <div className="text-muted-foreground">Loading channel...</div>;
-  if (errorChannel || !channelData?.data?.channel) return <div className="text-destructive">Channel not found.</div>;
+  if (loadingChannel) return <div className="text-muted-foreground text-center mt-20">Loading channel...</div>;
+  if (errorChannel || !channelData?.data?.channel) return <div className="text-destructive text-center mt-20">Channel not found.</div>;
 
   const channel = channelData.data.channel;
   const videos = videosData?.data?.videos || [];
   const tweets = tweetsData?.data?.tweets || [];
-  const playlists = playlistsData?.data?.playlists || [];
+  // Normalize playlists if the structure needs it, similar to Profile.jsx
+  const playlists = Array.isArray(playlistsData?.data?.playlists)
+    ? playlistsData.data.playlists.map(pl => ({
+        ...pl,
+        ownerDetails: pl.ownerDetails || pl.owner || {}, // Ensure ownerDetails is populated
+        videoCount: pl.videoCount || 0,
+      }))
+    : [];
 
   const isOwnChannel = user && channel.username === user.username;
   const isSubscribed = channel.isSubscribed;
   const avatarUrl = channel.avatar?.url || AVATAR_PLACEHOLDER;
-  const avatarLink = isOwnChannel ? "/profile" : `/channel/${channel.username}`;
+  // avatarLink is not directly used for navigation in return JSX, but kept for context if needed
+  // const avatarLink = isOwnChannel ? "/profile" : `/channel/${channel.username}`;
 
   return (
     <div className="py-8 px-4 max-w-7xl mx-auto">
@@ -98,7 +123,7 @@ export default function Channel() {
         channel={channel}
         userDataLoading={loadingChannel}
         subscribersCount={channel.subscribersCount || 0}
-        videosCount={videos.length}
+        videosCount={videos.length} // Note: This might not be accurate if videos are paginated/filtered
         rightContent={!isOwnChannel && (
           <button
             className={`bg-primary text-primary-foreground px-6 py-2 rounded-full font-semibold text-lg shadow hover:bg-primary/90 transition-colors flex items-center gap-2 ${subLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -130,6 +155,7 @@ export default function Channel() {
             <SortAndActionBar
               sortOrder={videoSort}
               onSortChange={setVideoSort}
+              // No action button for videos on a public channel page
             />
             <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-8">
               {loadingVideos
@@ -143,12 +169,18 @@ export default function Channel() {
             <SortAndActionBar
               sortOrder={postSort}
               onSortChange={setPostSort}
+              // No action button for creating posts on another user's channel page
             />
-            <div className="mb-8 px-2 max-w-2xl mx-auto flex flex-col gap-8">
-              {loadingTweets
-                ? Array.from({ length: 3 }).map((_, i) => <TweetCardSkeleton key={i} />)
-                : tweets.map((tweet) => <TweetCard key={tweet._id} tweet={tweet} />)}
-            </div>
+            {/* NEW: Use TweetListDisplay for posts */}
+            <TweetListDisplay
+              tweets={tweets}
+              isLoading={loadingTweets}
+              isError={errorTweets}
+              emptyText="No posts yet."
+              errorMessage={tweetsFetchError?.message || ""}
+              isOwner={false} // Always false for another user's channel
+              // No onEditTweet or onDeleteTweet needed here
+            />
           </>
         )}
         {tab === "playlists" && (
@@ -156,19 +188,18 @@ export default function Channel() {
             <SortAndActionBar
               sortOrder={playlistSort}
               onSortChange={setPlaylistSort}
+              // No action button for creating playlists on another user's channel page
             />
-            <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {loadingPlaylists
-                ? Array.from({ length: 3 }).map((_, i) => <PlaylistCardSkeleton key={i} />)
-                : playlists.map((playlist) => (
-                    <PlaylistCard
-                      key={playlist._id}
-                      playlist={playlist}
-                      onClick={() => navigate(`/playlist/${playlist._id}`)}
-                      className="cursor-pointer"
-                    />
-                  ))}
-            </div>
+            {/* NEW: Use PlaylistListDisplay for playlists */}
+            <PlaylistListDisplay
+              playlists={playlists}
+              isLoading={loadingPlaylists}
+              isError={errorPlaylists}
+              emptyText="No playlists yet."
+              errorMessage={playlistsFetchError?.message || ""}
+              // No onEditPlaylist or onDeletePlaylist needed here
+              // The PlaylistCard component inside PlaylistListDisplay already handles navigation to /playlist/:id
+            />
           </>
         )}
       </div>
