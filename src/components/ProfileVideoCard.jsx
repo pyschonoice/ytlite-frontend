@@ -1,7 +1,7 @@
 // src/components/ProfileVideoCard.jsx
 import { Pencil, X } from "lucide-react";
 import { Button } from "./ui/button";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"; // Use useNavigate for explicit navigation
 import Avatar from "./ui/Avatar";
 import { formatNumber, formatTimeAgo, formatDuration } from "../lib/utils";
 
@@ -9,30 +9,54 @@ export default function ProfileVideoCard({ video, onEdit, onDelete, className = 
   if (!video) return null;
 
   const navigate = useNavigate();
-  const channel = video.ownerDetails || video.owner;
-  const channelLink = channel?.username ? `/channel/${channel.username}` : undefined;
+  const channel = video.ownerDetails || video.owner; // Ensure channel details are available
+
+  // Function to navigate to the video details page
+  const handleVideoCardClick = (e) => {
+    // Only navigate if the click target is not an interactive element (button or link)
+    // This prevents clicks on action buttons or channel links from triggering video navigation
+    if (!e.target.closest('button, a')) {
+      navigate(`/video/${video._id}`);
+    }
+  };
+
+  // Function to navigate to the channel page
+  const handleChannelClick = (e) => {
+    e.stopPropagation(); // Prevent this click from bubbling up to handleVideoCardClick
+    if (channel?.username) {
+      navigate(`/channel/${channel.username}`);
+    }
+  };
+
+  // Function to handle Edit button click
+  const handleEditClick = (e) => {
+    e.stopPropagation(); // Prevent this click from bubbling up to handleVideoCardClick
+    onEdit(video);
+  };
+
+  // Function to handle Delete button click
+  const handleDeleteClick = (e) => {
+    e.stopPropagation(); // Prevent this click from bubbling up to handleVideoCardClick
+    onDelete(video);
+  };
+
 
   return (
     <div
       className={`group block rounded-lg overflow-hidden bg-card border border-border shadow hover:shadow-lg transition-all duration-200 relative ${className}`}
     >
-      {/* Action Buttons Overlay */}
-      {/* Increased padding and used background/foreground colors from theme for better visibility */}
-      <div className="absolute inset-0 flex items-start justify-end p-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <div className="flex gap-1 pointer-events-auto">
+      {/* Action Buttons Overlay - positioned absolutely on top of the card */}
+      <div className="absolute inset-0 flex items-start justify-end p-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+        <div className="flex gap-1 pointer-events-auto"> {/* Make buttons clickable here */}
           {/* Edit Button */}
           <Button
-            variant="ghost" // Use ghost for transparent background, allowing overlay opacity to show through
+            variant="ghost"
             size="icon"
             className="rounded-full w-8 h-8
-                       bg-secondary/70 text-secondary-foreground // Default state: semi-transparent secondary background with secondary-foreground text
-                       hover:bg-primary hover:text-primary-foreground // Hover state: primary background with primary-foreground text
+                       bg-secondary/70 text-secondary-foreground
+                       hover:bg-primary hover:text-primary-foreground
                        transition-colors duration-200"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onEdit(video);
-            }}
+            onClick={handleEditClick} // Use the specific handler
             aria-label="Edit video"
             title="Edit video"
           >
@@ -41,17 +65,13 @@ export default function ProfileVideoCard({ video, onEdit, onDelete, className = 
 
           {/* Delete Button */}
           <Button
-            variant="ghost" // Use ghost for transparent background
+            variant="ghost"
             size="icon"
             className="rounded-full w-8 h-8
-                       bg-secondary/70 text-secondary-foreground // Default state
-                       hover:bg-destructive hover:text-destructive-foreground // Hover state: destructive background with destructive-foreground text
+                       bg-secondary/70 text-secondary-foreground
+                       hover:bg-destructive hover:text-destructive-foreground
                        transition-colors duration-200"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onDelete(video);
-            }}
+            onClick={handleDeleteClick} // Use the specific handler
             aria-label="Delete video"
             title="Delete video"
           >
@@ -60,11 +80,9 @@ export default function ProfileVideoCard({ video, onEdit, onDelete, className = 
         </div>
       </div>
 
-      {/* The actual clickable content of the video card */}
-      <Link
-        to={`/video/${video._id}`}
-        className="block h-full w-full"
-      >
+      {/* Main clickable content area of the video card */}
+      {/* Attach onClick to this div to handle navigation */}
+      <div className="block h-full w-full cursor-pointer" onClick={handleVideoCardClick}>
         <div className="aspect-video bg-muted overflow-hidden relative">
           <img
             src={video.thumbnail?.url}
@@ -82,15 +100,12 @@ export default function ProfileVideoCard({ video, onEdit, onDelete, className = 
             {video.title}
           </div>
           <div className="flex items-center gap-2 mt-1">
-            {channelLink ? (
+            {/* Channel link as a button with specific handler */}
+            {channel && ( // Ensure channel exists before trying to render
               <button
                 type="button"
-                className="flex items-center gap-2 group/channel hover:underline bg-transparent border-none p-0 m-0 pointer-events-auto"
-                onClick={e => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  navigate(channelLink);
-                }}
+                className="flex items-center gap-2 group/channel hover:underline bg-transparent border-none p-0 m-0"
+                onClick={handleChannelClick} // Explicit handler for channel navigation
                 tabIndex={0}
               >
                 <Avatar user={channel} size="sm" />
@@ -98,13 +113,6 @@ export default function ProfileVideoCard({ video, onEdit, onDelete, className = 
                   {channel.fullName || channel.username}
                 </span>
               </button>
-            ) : (
-              <>
-                <Avatar user={channel} size="sm" />
-                <span className="text-xs text-muted-foreground font-medium">
-                  {channel?.fullName || channel?.username}
-                </span>
-              </>
             )}
           </div>
           <div className="text-xs text-muted-foreground flex gap-2">
@@ -113,7 +121,7 @@ export default function ProfileVideoCard({ video, onEdit, onDelete, className = 
             <span>{formatTimeAgo(video.createdAt)}</span>
           </div>
         </div>
-      </Link>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.jsx (Only Routes section updated)
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Header from "./components/layout/Header";
@@ -12,9 +12,10 @@ import Profile from "./pages/Profile";
 import UploadVideo from "./pages/UploadVideo";
 import History from "./pages/History";
 import Liked from "./pages/Liked";
-import Playlists from "./pages/Playlists"; // This is now for single playlist details
-import AllUserPlaylists from "./pages/AllUserPlaylists"; // <--- NEW IMPORT for the page listing ALL user playlists
+import Playlists from "./pages/Playlists";
+import AllUserPlaylists from "./pages/AllUserPlaylists";
 import Settings from "./pages/Settings";
+import TweetDetails from "./pages/TweetDetails"; // <-- NEW IMPORT
 
 import { useAuth } from "./contexts/AuthContext";
 import { cn } from "./lib/utils";
@@ -34,9 +35,9 @@ export default function App() {
   const isVideoPage = location.pathname.startsWith("/video/");
   const isAuthPage = ["/login", "/register"].includes(location.pathname);
   const isSettingsPage = location.pathname === "/settings";
-  // Add AllUserPlaylists page to the list that forces sidebar collapse (or adjust as needed for your design)
-  const isAllPlaylistsPage = location.pathname === "/playlists/all"; // New path
-  const forceSidebarCollapsed = isVideoPage || isAuthPage || isSettingsPage || isAllPlaylistsPage; // <--- UPDATED
+  const isAllPlaylistsPage = location.pathname === "/playlists/all";
+  const isTweetDetailsPage = location.pathname.startsWith("/tweet/"); // <-- NEW check
+  const forceSidebarCollapsed = isVideoPage || isAuthPage || isSettingsPage || isAllPlaylistsPage || isTweetDetailsPage; // <-- UPDATED
 
   useEffect(() => {
     if (forceSidebarCollapsed) {
@@ -70,17 +71,15 @@ export default function App() {
           onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
         <main
-          className={
-            cn(
-              "flex-1 overflow-y-auto transition-all duration-200 h-[calc(100vh-4rem)]",
-              "p-4 sm:p-6 lg:p-8",
-              {
-                "lg:ml-64": !sidebarCollapsed && !isAuthPage,
-                "lg:ml-20": sidebarCollapsed && !isAuthPage,
-                "ml-0": isAuthPage,
-              }
-            )
-          }
+          className={cn(
+            "flex-1 overflow-y-auto transition-all duration-200 h-[calc(100vh-4rem)]",
+            "p-4 sm:p-6 lg:p-8",
+            {
+              "lg:ml-64": !sidebarCollapsed && !isAuthPage,
+              "lg:ml-20": sidebarCollapsed && !isAuthPage,
+              "ml-0": isAuthPage,
+            }
+          )}
         >
           <Routes>
             <Route path="/" element={<Home />} />
@@ -95,8 +94,9 @@ export default function App() {
             <Route path="/upload" element={<PrivateRoute><UploadVideo /></PrivateRoute>} />
             <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
             <Route path="/liked" element={<PrivateRoute><Liked /></PrivateRoute>} />
-            <Route path="/playlist/:playlistId" element={<PrivateRoute><Playlists /></PrivateRoute>} /> {/* This is for a SINGLE playlist's details */}
-            <Route path="/playlists/all" element={<PrivateRoute><AllUserPlaylists /></PrivateRoute>} /> {/* <--- NEW ROUTE FOR ALL PLAYLISTS */}
+            <Route path="/playlist/:playlistId" element={<PrivateRoute><Playlists /></PrivateRoute>} />
+            <Route path="/playlists/all" element={<PrivateRoute><AllUserPlaylists /></PrivateRoute>} />
+            <Route path="/tweet/:tweetId" element={<PrivateRoute><TweetDetails /></PrivateRoute>} /> {/* <-- NEW ROUTE */}
             <Route path="*" element={<div className="text-center text-muted-foreground text-xl mt-20">404 - Page Not Found</div>} />
           </Routes>
         </main>

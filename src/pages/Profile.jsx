@@ -1,12 +1,15 @@
 // src/pages/Profile.jsx
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, api } from "../services/api";
-// Ensure getUserPlaylists is imported from playlistApi
-import { createPlaylist, updatePlaylistDetails, deletePlaylist, getUserPlaylists } from "../services/playlistApi";
+import {
+  createPlaylist,
+  updatePlaylistDetails,
+  deletePlaylist,
+  getUserPlaylists,
+} from "../services/playlistApi";
 import { useAuth } from "../contexts/AuthContext";
 import VideoCard from "../components/VideoCard";
 import VideoCardSkeleton from "../components/VideoCardSkeleton";
-// import PlaylistCard from "../components/PlaylistCard"; // If this is for generic display, might not be needed
 import PlaylistCardSkeleton from "../components/PlaylistCardSkeleton";
 import TweetCard from "../components/TweetCard";
 import TweetCardSkeleton from "../components/TweetCardSkeleton";
@@ -21,10 +24,11 @@ import CreateEditPlaylistModal from "../components/CreateEditPlaylistModal";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EditVideoModal from "../components/EditVideoModal";
 import ProfileVideoCard from "../components/ProfileVideoCard";
-// import ProfilePlaylistCard from "../components/ProfilePlaylistCard"; // Only needed if directly rendering cards
 import ProgressModal from "../components/ProgressModal";
-import PlaylistListDisplay from "../components/PlaylistListDisplay"; // Correct component for playlists tab
-
+import PlaylistListDisplay from "../components/PlaylistListDisplay";
+import TweetListDisplay from "../components/TweetListDisplay"; // NEW IMPORT
+import EditTweetModal from "../components/EditTweetModal"; // NEW IMPORT
+import CreateTweetModal from "../components/CreateTweetModal"; // NEW IMPORT for creating new posts
 
 const TABS = [
   { key: "videos", label: "Videos" },
@@ -43,7 +47,8 @@ export default function Profile() {
   const [postSort, setPostSort] = useState("desc");
   const [playlistSort, setPlaylistSort] = useState("desc");
 
-  const [showCreateEditPlaylistModal, setShowCreateEditPlaylistModal] = useState(false);
+  const [showCreateEditPlaylistModal, setShowCreateEditPlaylistModal] =
+    useState(false);
   const [playlistModalMode, setPlaylistModalMode] = useState("create");
   const [playlistToEdit, setPlaylistToEdit] = useState(null);
 
@@ -52,6 +57,14 @@ export default function Profile() {
 
   const [showDeletePlaylistModal, setShowDeletePlaylistModal] = useState(false);
   const [playlistToDelete, setPlaylistToDelete] = useState(null);
+
+  // New states for tweet modals
+  const [showCreateTweetModal, setShowCreateTweetModal] = useState(false);
+  const [showDeleteTweetModal, setShowDeleteTweetModal] = useState(false);
+  const [tweetToDelete, setTweetToDelete] = useState(null);
+
+  const [showEditTweetModal, setShowEditTweetModal] = useState(false);
+  const [tweetToEdit, setTweetToEdit] = useState(null);
 
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [progressModalTitle, setProgressModalTitle] = useState("");
@@ -66,14 +79,13 @@ export default function Profile() {
 
   const navigate = useNavigate();
 
-
   // Fetch channel data (for profile banner and general user info)
   const { data: userData } = useQuery({
     queryKey: ["profile", username],
     queryFn: () => get(`/user/c/${username}`),
-    enabled: !!username, // Only enable if username is available
+    enabled: !!username,
   });
-  const userId = userData?.data?.channel?._id; // Get userId from the fetched channel data
+  const userId = userData?.data?.channel?._id;
 
   const { data: subsData, isLoading: loadingSubscribers } = useQuery({
     queryKey: ["subscribers", username],
@@ -82,12 +94,19 @@ export default function Profile() {
   });
   const { data: videosData } = useQuery({
     queryKey: ["profileVideos", userId, videoSort],
-    queryFn: () => get(`/video/?userId=${userId}&sortBy=createdAt&sortType=${videoSort}`),
-    enabled: !!userId, // Enable only if userId is available
+    queryFn: () =>
+      get(`/video/?userId=${userId}&sortBy=createdAt&sortType=${videoSort}`),
+    enabled: !!userId,
   });
-  const { data: tweetsData } = useQuery({
+  const {
+    data: tweetsData,
+    isLoading: tweetsLoading,
+    isError: tweetsError,
+    error: tweetsFetchError,
+  } = useQuery({
     queryKey: ["tweets", username, postSort],
-    queryFn: () => get(`/tweet/c/${username}?sortBy=createdAt&sortType=${postSort}`),
+    queryFn: () =>
+      get(`/tweet/c/${username}?sortBy=createdAt&sortType=${postSort}`),
     enabled: !!username,
   });
   const {
@@ -97,14 +116,13 @@ export default function Profile() {
     error: playlistsFetchError,
   } = useQuery({
     queryKey: ["userPlaylists", userId, playlistSort],
-    // Make sure userId is definitely available here before calling getUserPlaylists
     queryFn: () => {
-        if (userId) { // Defensive check inside queryFn
-            return getUserPlaylists(userId);
-        }
-        throw new Error("User ID is not available for fetching playlists.");
+      if (userId) {
+        return getUserPlaylists(userId);
+      }
+      throw new Error("User ID is not available for fetching playlists.");
     },
-    enabled: !!userId, // Only enable if userId is available
+    enabled: !!userId,
   });
   const { data: subscribedData, isLoading: loadingSubscribed } = useQuery({
     queryKey: ["subscribedChannels", username],
@@ -113,27 +131,142 @@ export default function Profile() {
   });
 
   const channel = userData?.data?.channel;
-  const videos = videosData?.data?.videos || (Array.isArray(videosData?.data) ? videosData.data : []) || [];
+
+  const videos =
+    videosData?.data?.videos ||
+    (Array.isArray(videosData?.data) ? videosData.data : []) ||
+    [];
   const tweets = tweetsData?.data?.tweets || tweetsData?.data || [];
-  // Normalize playlists for the UI
-  // Assuming backend response is data.data.playlists or data.playlists directly
-  // Check the backend's getUserPlaylists controller output carefully.
-  
-  const playlists = Array.isArray(playlistsData?.data?.playlists) // If backend nests under data.playlists
-    ? playlistsData.data.playlists.map(pl => ({
-       
+  const playlists = Array.isArray(playlistsData?.data?.playlists)
+    ? playlistsData.data.playlists.map((pl) => ({
         ...pl,
         ownerDetails: pl.ownerDetails || pl.owner || user || {},
-        videoCount: pl.videoCount || 0, // This relies on `videos` being an array of objects/IDs
+        videoCount: pl.videoCount || 0,
       }))
-    :[]
+    : [];
 
-
-  
   const subscribers = subsData?.data?.subscribers || [];
-  const subscribedChannels = subscribedData?.data?.channels || subscribedData?.data || [];
+  const subscribedChannels =
+    subscribedData?.data?.channels || subscribedData?.data || [];
 
   const isOwnProfile = user && channel && user._id === channel._id;
+
+  // --- NEW: TWEET CREATION LOGIC ---
+  const createTweetMutation = useMutation({
+    mutationFn: (data) => api.post("/tweet/create", { content: data.content }),
+    onMutate: () => {
+      setShowCreateTweetModal(false);
+      setProgressModalTitle("Creating Post...");
+      setProgressModalDescription("Please wait while your new post is being published.");
+      setProgressModalVariant("loading");
+      setShowProgressModal(true);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["tweets", username]);
+      setProgressModalTitle("Success!");
+      setProgressModalDescription("Post created successfully!");
+      setProgressModalVariant("success");
+      setTimeout(() => setShowProgressModal(false), 2000);
+    },
+    onError: (err) => {
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(
+        err?.response?.data?.message || "Failed to create post."
+      );
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error("Create post failed:", err);
+    },
+  });
+
+  const handleCreateTweetSubmit = (data) => {
+    createTweetMutation.mutate(data);
+  };
+
+  const handleOpenCreateTweetModal = () => {
+    setShowCreateTweetModal(true);
+  };
+
+  // --- TWEET DELETION LOGIC ---
+  const deleteTweetMutation = useMutation({
+    mutationFn: (tweetId) => api.delete(`/tweet/${tweetId}`),
+    onMutate: () => {
+      setShowDeleteTweetModal(false);
+      setProgressModalTitle("Deleting Post...");
+      setProgressModalDescription(
+        "Please wait while the post is being permanently removed."
+      );
+      setProgressModalVariant("loading");
+      setShowProgressModal(true);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["tweets", username]);
+      setProgressModalTitle("Success!");
+      setProgressModalDescription("Post deleted successfully!");
+      setProgressModalVariant("success");
+      setTweetToDelete(null);
+      setTimeout(() => setShowProgressModal(false), 2000);
+    },
+    onError: (err) => {
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(
+        err?.response?.data?.message || "Failed to delete post."
+      );
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error("Delete post failed:", err);
+    },
+  });
+
+  const onTweetDeleteClick = (tweet) => {
+    setTweetToDelete(tweet);
+    setShowDeleteTweetModal(true);
+  };
+
+  const confirmTweetDelete = () => {
+    if (tweetToDelete) {
+      deleteTweetMutation.mutate(tweetToDelete._id);
+    }
+  };
+
+  // --- TWEET EDIT LOGIC ---
+  const updateTweetMutation = useMutation({
+    mutationFn: (data) =>
+      api.patch(`/tweet/${tweetToEdit._id}`, { content: data.content }),
+    onMutate: () => {
+      setShowEditTweetModal(false);
+      setProgressModalTitle("Updating Post...");
+      setProgressModalDescription("Saving changes to your post.");
+      setProgressModalVariant("loading");
+      setShowProgressModal(true);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["tweets", username]);
+      setProgressModalTitle("Success!");
+      setProgressModalDescription("Post updated successfully!");
+      setProgressModalVariant("success");
+      setTweetToEdit(null);
+      setTimeout(() => setShowProgressModal(false), 2000);
+    },
+    onError: (err) => {
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(
+        err?.response?.data?.message || "Failed to update post."
+      );
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error("Update post failed:", err);
+    },
+  });
+
+  const onTweetEditClick = (tweet) => {
+    setTweetToEdit(tweet);
+    setShowEditTweetModal(true);
+  };
+
+  const handleEditTweetSubmit = (data) => {
+    updateTweetMutation.mutate(data);
+  };
 
   // --- VIDEO DELETION LOGIC ---
   const deleteVideoMutation = useMutation({
@@ -141,37 +274,70 @@ export default function Profile() {
     onMutate: async (deletedVideoId) => {
       setShowDeleteVideoModal(false);
       setProgressModalTitle("Deleting Video...");
-      setProgressModalDescription("Please wait while the video is being permanently removed.");
+      setProgressModalDescription(
+        "Please wait while the video is being permanently removed."
+      );
       setProgressModalVariant("loading");
       setShowProgressModal(true);
 
       await queryClient.cancelQueries(["profileVideos", userId, videoSort]);
-      const previousVideosData = queryClient.getQueryData(["profileVideos", userId, videoSort]);
+      const previousVideosData = queryClient.getQueryData([
+        "profileVideos",
+        userId,
+        videoSort,
+      ]);
       let currentVideosArray = [];
       if (previousVideosData) {
-          if (Array.isArray(previousVideosData)) {
-              currentVideosArray = previousVideosData;
-          } else if (previousVideosData.videos) {
-              currentVideosArray = previousVideosData.videos;
-          } else if (previousVideosData.data && previousVideosData.data.videos) {
-              currentVideosArray = previousVideosData.data.videos;
-          } else if (previousVideosData.data && Array.isArray(previousVideosData.data)) {
-              currentVideosArray = previousVideosData.data;
-          }
+        if (Array.isArray(previousVideosData)) {
+          currentVideosArray = previousVideosData;
+        } else if (previousVideosData.videos) {
+          currentVideosArray = previousVideosData.videos;
+        } else if (previousVideosData.data && previousVideosData.data.videos) {
+          currentVideosArray = previousVideosData.data.videos;
+        } else if (
+          previousVideosData.data &&
+          Array.isArray(previousVideosData.data)
+        ) {
+          currentVideosArray = previousVideosData.data;
+        }
       }
-      const newVideosArray = currentVideosArray.filter(video => video._id !== deletedVideoId);
-      if (previousVideosData && typeof previousVideosData === 'object' && !Array.isArray(previousVideosData)) {
-          if (previousVideosData.videos) {
-              queryClient.setQueryData(["profileVideos", userId, videoSort], { ...previousVideosData, videos: newVideosArray });
-          } else if (previousVideosData.data && previousVideosData.data.videos) {
-              queryClient.setQueryData(["profileVideos", userId, videoSort], { ...previousVideosData, data: { ...previousVideosData.data, videos: newVideosArray } });
-          } else if (previousVideosData.data && Array.isArray(previousVideosData.data)) {
-              queryClient.setQueryData(["profileVideos", userId, videoSort], { ...previousVideosData, data: newVideosArray });
-          } else {
-              queryClient.setQueryData(["profileVideos", userId, videoSort], newVideosArray);
-          }
+      const newVideosArray = currentVideosArray.filter(
+        (video) => video._id !== deletedVideoId
+      );
+      if (
+        previousVideosData &&
+        typeof previousVideosData === "object" &&
+        !Array.isArray(previousVideosData)
+      ) {
+        if (previousVideosData.videos) {
+          queryClient.setQueryData(["profileVideos", userId, videoSort], {
+            ...previousVideosData,
+            videos: newVideosArray,
+          });
+        } else if (previousVideosData.data && previousVideosData.data.videos) {
+          queryClient.setQueryData(["profileVideos", userId, videoSort], {
+            ...previousVideosData,
+            data: { ...previousVideosData.data, videos: newVideosArray },
+          });
+        } else if (
+          previousVideosData.data &&
+          Array.isArray(previousVideosData.data)
+        ) {
+          queryClient.setQueryData(["profileVideos", userId, videoSort], {
+            ...previousVideosData,
+            data: newVideosArray,
+          });
+        } else {
+          queryClient.setQueryData(
+            ["profileVideos", userId, videoSort],
+            newVideosArray
+          );
+        }
       } else {
-          queryClient.setQueryData(["profileVideos", userId, videoSort], newVideosArray);
+        queryClient.setQueryData(
+          ["profileVideos", userId, videoSort],
+          newVideosArray
+        );
       }
       return { previousVideosData };
     },
@@ -188,10 +354,15 @@ export default function Profile() {
     },
     onError: (err, deletedVideoId, context) => {
       if (context?.previousVideosData) {
-        queryClient.setQueryData(["profileVideos", userId, videoSort], context.previousVideosData);
+        queryClient.setQueryData(
+          ["profileVideos", userId, videoSort],
+          context.previousVideosData
+        );
       }
       setProgressModalTitle("Error!");
-      setProgressModalDescription(err?.response?.data?.message || "Failed to delete video.");
+      setProgressModalDescription(
+        err?.response?.data?.message || "Failed to delete video."
+      );
       setProgressModalVariant("error");
       console.error("Delete video failed:", err);
       setTimeout(() => {
@@ -250,8 +421,7 @@ export default function Profile() {
     }
   };
 
-
-  // --- PLAYLIST CREATE/EDIT LOGIC (for profile page's "Create Playlist" button) ---
+  // --- PLAYLIST CREATE/EDIT LOGIC ---
   const createEditPlaylistMutation = useMutation({
     mutationFn: async (data) => {
       if (playlistModalMode === "create") {
@@ -263,7 +433,9 @@ export default function Profile() {
     },
     onMutate: () => {
       setShowCreateEditPlaylistModal(false);
-      setProgressModalTitle(playlistModalMode === "create" ? "Creating Playlist..." : "Saving Playlist...");
+      setProgressModalTitle(
+        playlistModalMode === "create" ? "Creating Playlist..." : "Saving Playlist..."
+      );
       setProgressModalDescription(
         playlistModalMode === "create"
           ? "Please wait while your new playlist is being created."
@@ -274,10 +446,12 @@ export default function Profile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["userPlaylists", userId]);
-      queryClient.invalidateQueries(["allUserPlaylists", user?._id]); // Invalidate for AllUserPlaylists page too
+      queryClient.invalidateQueries(["allUserPlaylists", user?._id]);
       setProgressModalTitle(playlistModalMode === "create" ? "Success!" : "Saved!");
       setProgressModalDescription(
-        playlistModalMode === "create" ? "Playlist created successfully!" : "Playlist updated successfully!"
+        playlistModalMode === "create"
+          ? "Playlist created successfully!"
+          : "Playlist updated successfully!"
       );
       setProgressModalVariant("success");
       setPlaylistToEdit(null);
@@ -285,7 +459,9 @@ export default function Profile() {
     },
     onError: (err) => {
       setProgressModalTitle("Error!");
-      setProgressModalDescription(err?.response?.data?.message || `Failed to ${playlistModalMode} playlist.`);
+      setProgressModalDescription(
+        err?.response?.data?.message || `Failed to ${playlistModalMode} playlist.`
+      );
       setProgressModalVariant("error");
       setTimeout(() => setShowProgressModal(false), 3000);
       console.error(`${playlistModalMode} playlist failed:`, err);
@@ -308,20 +484,21 @@ export default function Profile() {
     setShowCreateEditPlaylistModal(true);
   };
 
-
   // --- PLAYLIST DELETION LOGIC ---
   const deletePlaylistMutation = useMutation({
     mutationFn: (playlistId) => deletePlaylist(playlistId),
     onMutate: () => {
       setShowDeletePlaylistModal(false);
       setProgressModalTitle("Deleting Playlist...");
-      setProgressModalDescription("Please wait while the playlist is being permanently removed.");
+      setProgressModalDescription(
+        "Please wait while the playlist is being permanently removed."
+      );
       setProgressModalVariant("loading");
       setShowProgressModal(true);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(["userPlaylists", userId]);
-      queryClient.invalidateQueries(["allUserPlaylists", user?._id]); // Invalidate for AllUserPlaylists page too
+      queryClient.invalidateQueries(["allUserPlaylists", user?._id]);
       setProgressModalTitle("Success!");
       setProgressModalDescription("Playlist deleted successfully!");
       setProgressModalVariant("success");
@@ -330,7 +507,9 @@ export default function Profile() {
     },
     onError: (err) => {
       setProgressModalTitle("Error!");
-      setProgressModalDescription(err?.response?.data?.message || "Failed to delete playlist.");
+      setProgressModalDescription(
+        err?.response?.data?.message || "Failed to delete playlist."
+      );
       setProgressModalVariant("error");
       setTimeout(() => setShowProgressModal(false), 3000);
       console.error("Delete playlist failed:", err);
@@ -348,10 +527,9 @@ export default function Profile() {
     }
   };
 
-
   return (
     <div className="py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-0"> {/* Added new wrapper for content centering */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-0">
         <ProfileBanner
           channel={channel}
           userDataLoading={userData?.isLoading}
@@ -363,7 +541,11 @@ export default function Profile() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`py-3 px-4 font-semibold text-base transition-colors border-b-2 ${tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`py-3 px-4 font-semibold text-base transition-colors border-b-2 ${
+                tab === t.key
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
             >
               {t.label}
             </button>
@@ -375,25 +557,27 @@ export default function Profile() {
               <SortAndActionBar
                 sortOrder={videoSort}
                 onSortChange={setVideoSort}
-                actionLabel={"+ Upload"}
+                actionLabel={"Upload"}
                 actionIcon={<Video className="w-5 h-5" />}
                 onAction={() => (window.location.href = "/upload")}
               />
               <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-8">
                 {videosData?.isLoading
-                  ? Array.from({ length: 5 }).map((_, i) => <VideoCardSkeleton key={i} />)
-                  : videos.map((video) => (
-                    isOwnProfile ? (
-                      <ProfileVideoCard
-                        key={video._id}
-                        video={video}
-                        onEdit={onVideoEditClick}
-                        onDelete={onVideoDeleteClick}
-                      />
-                    ) : (
-                      <VideoCard key={video._id} video={video} />
-                    )
-                  ))}
+                  ? Array.from({ length: 5 }).map((_, i) => (
+                      <VideoCardSkeleton key={i} />
+                    ))
+                  : videos.map((video) =>
+                      isOwnProfile ? (
+                        <ProfileVideoCard
+                          key={video._id}
+                          video={video}
+                          onEdit={onVideoEditClick}
+                          onDelete={onVideoDeleteClick}
+                        />
+                      ) : (
+                        <VideoCard key={video._id} video={video} />
+                      )
+                    )}
               </div>
             </>
           )}
@@ -402,15 +586,19 @@ export default function Profile() {
               <SortAndActionBar
                 sortOrder={postSort}
                 onSortChange={setPostSort}
-                actionLabel={"+ Post"}
-                actionIcon={<Pencil className="w-5 h-5" />}
-                onAction={() => alert("Create Post coming soon!")}
+                actionLabel={"Post"}
+                actionIcon={<Plus className="w-5 h-5" />} 
+                onAction={handleOpenCreateTweetModal}
               />
-              <div className="mb-8 px-2 max-w-2xl mx-auto flex flex-col gap-8">
-                {tweetsData?.isLoading
-                  ? Array.from({ length: 3 }).map((_, i) => <TweetCardSkeleton key={i} />)
-                  : tweets.map((tweet) => <TweetCard key={tweet._id} tweet={tweet} />)}
-              </div>
+              <TweetListDisplay
+                tweets={tweets}
+                isLoading={tweetsLoading}
+                isError={tweetsError}
+                emptyText="No tweets yet."
+                isOwner={isOwnProfile}
+                onEditTweet={onTweetEditClick}
+                onDeleteTweet={onTweetDeleteClick}
+              />
             </>
           )}
           {tab === "playlists" && (
@@ -418,7 +606,7 @@ export default function Profile() {
               <SortAndActionBar
                 sortOrder={playlistSort}
                 onSortChange={setPlaylistSort}
-                actionLabel={"+ Create"}
+                actionLabel={"Create"}
                 actionIcon={<List className="w-5 h-5" />}
                 onAction={handleOpenCreatePlaylistModal}
               />
@@ -435,34 +623,60 @@ export default function Profile() {
           )}
           {tab === "subscribed" && (
             <div className="flex flex-col gap-4 mb-8">
-              {loadingSubscribed
-                ? Array.from({ length: 5 }).map((_, i) => <AvatarSkeleton key={i} size="lg" />)
-                : (subscribedChannels.length === 0 ? <div className="text-muted-foreground">No subscriptions yet.</div> :
-                  subscribedChannels.map((ch) => (
-                    <Link key={ch._id} to={`/channel/${ch.username}`} className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition">
-                      <Avatar user={ch} size="lg" />
-                      <div>
-                        <div className="font-semibold text-card-foreground">{ch.fullName || ch.username}</div>
-                        <div className="text-muted-foreground text-sm">@{ch.username}</div>
+              {loadingSubscribed ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <AvatarSkeleton key={i} size="lg" />
+                ))
+              ) : subscribedChannels.length === 0 ? (
+                <div className="text-muted-foreground">No subscriptions yet.</div>
+              ) : (
+                subscribedChannels.map((ch) => (
+                  <Link
+                    key={ch._id}
+                    to={`/channel/${ch.username}`}
+                    className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition"
+                  >
+                    <Avatar user={ch} size="lg" />
+                    <div>
+                      <div className="font-semibold text-card-foreground">
+                        {ch.fullName || ch.username}
                       </div>
-                    </Link>
-                  )))}
+                      <div className="text-muted-foreground text-sm">
+                        @{ch.username}
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              )}
             </div>
           )}
           {tab === "subscribers" && (
             <div className="flex flex-col gap-4 mb-8">
-              {loadingSubscribers
-                ? Array.from({ length: 5 }).map((_, i) => <AvatarSkeleton key={i} size="lg" />)
-                : (subscribers.length === 0 ? <div className="text-muted-foreground">No subscribers yet.</div> :
-                  subscribers.map((ch) => (
-                    <Link key={ch._id} to={`/channel/${ch.username}`} className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition">
-                      <Avatar user={ch} size="lg" />
-                      <div>
-                        <div className="font-semibold text-card-foreground">{ch.fullName || ch.username}</div>
-                        <div className="text-muted-foreground text-sm">@{ch.username}</div>
+              {loadingSubscribers ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <AvatarSkeleton key={i} size="lg" />
+                ))
+              ) : subscribers.length === 0 ? (
+                <div className="text-muted-foreground">No subscribers yet.</div>
+              ) : (
+                subscribers.map((ch) => (
+                  <Link
+                    key={ch._id}
+                    to={`/channel/${ch.username}`}
+                    className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition"
+                  >
+                    <Avatar user={ch} size="lg" />
+                    <div>
+                      <div className="font-semibold text-card-foreground">
+                        {ch.fullName || ch.username}
                       </div>
-                    </Link>
-                  )))}
+                      <div className="text-muted-foreground text-sm">
+                        @{ch.username}
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -474,18 +688,38 @@ export default function Profile() {
         onClose={() => setShowDeleteVideoModal(false)}
         onConfirm={confirmVideoDelete}
         isLoading={deleteVideoMutation.isLoading}
-        title={"Delete Video"}
-        description={`Are you sure you want to delete "${videoToDelete?.title}"? This action cannot be undone and the video will be permanently removed.`}
+        title="Delete Video"
+        description={`Are you sure you want to delete "${
+          videoToDelete?.title || "this video"
+        }"? This action cannot be undone and the video will be permanently removed.`}
+        confirmText="Delete"
+        confirmVariant="destructive"
       />
-  
+
       {/* Confirmation Modal for Playlist Delete */}
       <ConfirmDeleteModal
         open={showDeletePlaylistModal}
         onClose={() => setShowDeletePlaylistModal(false)}
         onConfirm={confirmPlaylistDelete}
-        title={"Delete Playlist"}
-        description={`Are you sure you want to delete "${playlistToDelete?.name || "this playlist"}"? This action cannot be undone and the playlist will be permanently removed.`}
-        
+        isLoading={deletePlaylistMutation.isLoading}
+        title="Delete Playlist"
+        description={`Are you sure you want to delete the playlist "${
+          playlistToDelete?.name || "this playlist"
+        }"? This action cannot be undone and the playlist will be permanently removed.`}
+        confirmText="Delete"
+        confirmVariant="destructive"
+      />
+
+      {/* Confirmation Modal for Tweet Delete */}
+      <ConfirmDeleteModal
+        open={showDeleteTweetModal}
+        onClose={() => setShowDeleteTweetModal(false)}
+        onConfirm={confirmTweetDelete}
+        isLoading={deleteTweetMutation.isLoading}
+        title="Delete Post"
+        description={`Are you sure you want to delete this post? This action cannot be undone and the post will be permanently removed.`}
+        confirmText="Delete"
+        confirmVariant="destructive"
       />
 
       {/* Progress/Status Modal */}
@@ -512,13 +746,52 @@ export default function Profile() {
       {/* Create/Edit Playlist Modal for Profile Page */}
       <CreateEditPlaylistModal
         open={showCreateEditPlaylistModal}
-        onClose={() => { setShowCreateEditPlaylistModal(false); setPlaylistToEdit(null); }}
+        onClose={() => {
+          setShowCreateEditPlaylistModal(false);
+          setPlaylistToEdit(null);
+        }}
         onSubmit={handleCreateEditPlaylistSubmit}
         loading={createEditPlaylistMutation.isLoading}
-        error={createEditPlaylistMutation.isError ? (createEditPlaylistMutation.error?.response?.data?.message || "Operation failed") : ""}
+        error={
+          createEditPlaylistMutation.isError
+            ? createEditPlaylistMutation.error?.response?.data?.message ||
+              "Operation failed"
+            : ""
+        }
         mode={playlistModalMode}
         initialName={playlistToEdit?.name || ""}
         initialDescription={playlistToEdit?.description || ""}
+      />
+
+      {/* Edit Tweet Modal */}
+      {tweetToEdit && (
+        <EditTweetModal
+          open={showEditTweetModal}
+          onClose={() => setShowEditTweetModal(false)}
+          tweet={tweetToEdit}
+          onSubmit={handleEditTweetSubmit}
+          isLoading={updateTweetMutation.isLoading}
+          error={
+            updateTweetMutation.isError
+              ? updateTweetMutation.error?.response?.data?.message ||
+                "Failed to update tweet."
+              : ""
+          }
+        />
+      )}
+
+      {/* Create Tweet Modal */}
+      <CreateTweetModal
+        open={showCreateTweetModal}
+        onClose={() => setShowCreateTweetModal(false)}
+        onSubmit={handleCreateTweetSubmit}
+        isLoading={createTweetMutation.isLoading}
+        error={
+          createTweetMutation.isError
+            ? createTweetMutation.error?.response?.data?.message ||
+              "Failed to create tweet."
+            : ""
+        }
       />
     </div>
   );
