@@ -1,62 +1,145 @@
-import { Link } from "react-router-dom";
-import { Home, User, TrendingUp, Clock, Heart, List } from "lucide-react";
+// src/components/layout/Sidebar.jsx
+import React from "react";
+import { Link, NavLink } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import {
+  Home as HomeIcon,
+  Video as VideoIcon,
+  User as UserIcon,
+  List as ListIcon,
+  History as HistoryIcon,
+  ThumbsUp as ThumbsUpIcon,
+  LogOut as LogoutIcon,
+  Settings as SettingsIcon,
+} from "lucide-react";
+import { Button } from "../ui/button";
 import { useAuth } from "../../contexts/AuthContext";
-import { cn } from "../../lib/utils";
 
 export default function Sidebar({ collapsed, isMobileOpen, onCloseMobile }) {
-  const { user } = useAuth();
-  const navigationItems = [
-    { icon: Home, label: "Home", path: "/", always: true },
-    { icon: TrendingUp, label: "Trending", path: "/trending", always: true },
-    { icon: Clock, label: "History", path: "/history", auth: true },
-    { icon: Heart, label: "Liked", path: "/liked", auth: true },
-    { icon: User, label: "Profile", path: "/profile", auth: true },
-  ];
+  const { user, logout } = useAuth();
+
+  const navItems = user
+    ? [
+        { name: "Home", icon: HomeIcon, path: "/" },
+        { name: "My Channel", icon: UserIcon, path: `/channel/${user.username}` },
+        { name: "History", icon: HistoryIcon, path: "/history" },
+        { name: "Liked Videos", icon: ThumbsUpIcon, path: "/liked" },
+        { name: "Playlists", icon: ListIcon, path: "/playlists/all" }, 
+        { name: "Upload Video", icon: VideoIcon, path: "/upload" },
+        { name: "Settings", icon: SettingsIcon, path: "/settings" },
+      ]
+    : [{ name: "Home", icon: HomeIcon, path: "/" }];
 
   return (
     <>
-      {/* Overlay for mobile when sidebar is open */}
+      {/* Mobile Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
           onClick={onCloseMobile}
         ></div>
       )}
 
+      {/* Actual Sidebar */}
       <aside
         className={cn(
-          "flex flex-col border-r border-border bg-sidebar text-sidebar-foreground transition-all duration-200 z-40",
-          // Desktop behavior (sticky, pushes content)
-          "hidden lg:flex sticky top-16 h-[calc(100vh-4rem)]", // Fixed height, starts below header
-          collapsed ? "w-20" : "w-52",
-          // Mobile behavior (fixed, overlays content)
-          isMobileOpen
-            ? "left-0 fixed top-0 h-full" // Visible fixed overlay
-            : "-left-full lg:left-auto" // Hidden on mobile, auto-position on desktop
+          "fixed top-16 left-0 h-[calc(100vh-4rem)] bg-sidebar border-r border-sidebar-border z-50 overflow-y-auto transition-all duration-200",
+          "font-sans", // Apply the font family here
+          "hidden lg:block",
+          {
+            "w-64": !collapsed,
+            "w-20": collapsed,
+          }
         )}
       >
-        <nav className="space-y-2 flex-1 p-4 mt-0 overflow-y-auto custom-scrollbar">
-          {navigationItems.map((item) => {
-            if (item.auth && !user) return null;
-            if (!item.auth && !item.always) return null;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={onCloseMobile} // Close sidebar on navigation for mobile
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
-                  collapsed && "justify-center px-0"
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                {!collapsed && (
-                  <span className="font-medium">{item.label}</span>
-                )}
-              </Link>
-            );
-          })}
+        <nav className="flex flex-col p-2 space-y-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center rounded-md px-3 py-2 transition-colors",
+                  "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  isActive &&
+                    "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                )
+              }
+            >
+              <item.icon
+                className={cn("shrink-0", { "size-5": !collapsed, "size-6": collapsed })}
+              />
+              {!collapsed && (
+                <span className="ml-3 text-sm font-medium">{item.name}</span>
+              )}
+            </NavLink>
+          ))}
+          {user && (
+            <Button
+              variant="ghost"
+              className={cn(
+                "flex items-center justify-start rounded-md px-3 py-2 transition-colors",
+                "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                { "w-full": !collapsed, "w-auto": collapsed }
+              )}
+              onClick={() => {
+                logout();
+                if (isMobileOpen) onCloseMobile();
+              }}
+            >
+              <LogoutIcon
+                className={cn("shrink-0", { "size-5": !collapsed, "size-6": collapsed })}
+              />
+              {!collapsed && (
+                <span className="ml-3 text-sm font-medium">Logout</span>
+              )}
+            </Button>
+          )}
+        </nav>
+      </aside>
+
+      {/* Mobile Sidebar */}
+      <aside
+        className={cn(
+          "fixed top-16 left-0 h-[calc(100vh-4rem)] bg-sidebar border-r border-sidebar-border z-50 overflow-y-auto transition-transform duration-300 transform",
+          "font-sans", // Apply font here too
+          "lg:hidden",
+          isMobileOpen ? "translate-x-0" : "-translate-x-full",
+          "w-64"
+        )}
+      >
+        <nav className="flex flex-col p-2 space-y-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.name}
+              to={item.path}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center rounded-md px-3 py-2 transition-colors",
+                  "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  isActive &&
+                    "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                )
+              }
+              onClick={onCloseMobile}
+            >
+              <item.icon className="size-5 shrink-0" />
+              <span className="ml-3 text-sm font-medium">{item.name}</span>
+            </NavLink>
+          ))}
+          {user && (
+            <Button
+              variant="ghost"
+              className="flex items-center justify-start rounded-md px-3 py-2 transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground w-full"
+              onClick={() => {
+                logout();
+                onCloseMobile();
+              }}
+            >
+              <LogoutIcon className="size-5 shrink-0" />
+              <span className="ml-3 text-sm font-medium">Logout</span>
+            </Button>
+          )}
         </nav>
       </aside>
     </>

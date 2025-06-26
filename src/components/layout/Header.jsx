@@ -1,7 +1,10 @@
+// src/components/layout/Header.jsx
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import ThemeToggle from "../ui/ThemeToggle";
-import { Menu, X, Plus, User } from "lucide-react";
+// Imported SettingsIcon (already there)
+// Added LogOut icon for consistency with logout functionality
+import { Menu, X, Plus, User, Settings as SettingsIcon, LogOut as LogoutIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 
@@ -11,7 +14,7 @@ export default function Header({
   onToggleSidebar,
   onToggleMobileSidebar,
   sidebarCollapsed,
-  isSidebarToggleDisabled = false, // New prop with default value
+  isSidebarToggleDisabled = false,
 }) {
   const { user, logout } = useAuth();
   const [isMobileDropdownOpen, setIsMobileDropdownOpen] = useState(false);
@@ -50,8 +53,8 @@ export default function Header({
                 sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
               }
               onClick={onToggleSidebar}
-              disabled={isSidebarToggleDisabled} // Disable the button here
-              className={isSidebarToggleDisabled ? "opacity-50 cursor-not-allowed" : ""} // Visual feedback
+              disabled={isSidebarToggleDisabled}
+              className={isSidebarToggleDisabled ? "opacity-50 cursor-not-allowed" : ""}
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -79,7 +82,32 @@ export default function Header({
           )}
           <ThemeToggle />
           {user ? (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+             
+              {/* Logout Icon (size h-5 w-5, consistent with ThemeToggle) */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full size-9 flex items-center justify-center" // Ensure actual button size is consistent
+                onClick={logout}
+                aria-label="Logout"
+                title="Logout"
+              >
+                <LogoutIcon className="h-6 w-6" /> {/* Explicitly setting icon size to h-5 w-5 */}
+              </Button>
+             {/* Settings Icon (size h-5 w-5, consistent with ThemeToggle) */}
+             <Button
+                variant="ghost"
+                size="icon" // size="icon" makes button size 9 (h-9 w-9 by default), and inner icon size 4 (h-4 w-4)
+                className="rounded-full size-9 flex items-center justify-center" // Ensure actual button size is consistent
+                onClick={() => navigate("/settings")}
+                aria-label="Account settings"
+                title="Account settings"
+              >
+                <SettingsIcon className="h-6 w-6" /> {/* Explicitly setting icon size to h-5 w-5 */}
+              </Button>
+
+              {/* Profile Avatar */}
               <Link
                 to={avatarLink}
                 className="flex items-center"
@@ -87,15 +115,9 @@ export default function Header({
                 <img
                   src={avatarUrl}
                   alt={user.fullName || user.username || "User"}
-                  className="w-9 h-9 rounded-full object-cover border border-border bg-muted"
+                  className="w-10 h-10 rounded-full object-cover border border-border bg-muted"
                 />
               </Link>
-              <button
-                onClick={logout}
-                className="text-sm hover:text-destructive transition-colors"
-              >
-                Logout
-              </button>
             </div>
           ) : (
             <div className="flex items-center gap-4">
@@ -144,22 +166,30 @@ export default function Header({
         <div className="absolute top-16 left-0 right-0 bg-card border-b border-border md:hidden animate-in slide-in-from-top-2 fade-in-80">
           <div className="px-4 py-4 space-y-4">
             {user && (
-              <button
-                onClick={() => {
-                  setIsMobileDropdownOpen(false);
-                  navigate("/upload");
-                }}
-                className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors w-full justify-center"
-              >
-                <Plus className="h-4 w-4" />
-                Create
-              </button>
-            )}
-            {user ? (
               <>
+                <button
+                  onClick={() => {
+                    setIsMobileDropdownOpen(false);
+                    navigate("/upload");
+                  }}
+                  className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors w-full justify-center"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create
+                </button>
+                {/* Settings Link for Mobile */}
+                <Link
+                  to="/settings"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted rounded-md transition-colors"
+                  onClick={() => setIsMobileDropdownOpen(false)}
+                >
+                  <SettingsIcon className="h-5 w-5" />
+                  Account Settings
+                </Link>
+                {/* Profile Link for Mobile */}
                 <Link
                   to={avatarLink}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted rounded-md transition-colors"
                   onClick={() => setIsMobileDropdownOpen(false)}
                 >
                   <img
@@ -167,18 +197,22 @@ export default function Header({
                     alt={user.fullName || user.username || "User"}
                     className="w-8 h-8 rounded-full object-cover border border-border bg-muted"
                   />
+                  <span className="font-medium">{user.fullName || user.username}</span>
                 </Link>
+                {/* Logout Link/Button for Mobile */}
                 <button
                   onClick={() => {
                     logout();
                     setIsMobileDropdownOpen(false);
                   }}
-                  className="block text-sm hover:text-destructive transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md transition-colors w-full"
                 >
+                  <LogoutIcon className="h-5 w-5" /> {/* Consistent icon size */}
                   Logout
                 </button>
               </>
-            ) : (
+            )}
+            {!user && (
               <>
                 <Link
                   to="/login"

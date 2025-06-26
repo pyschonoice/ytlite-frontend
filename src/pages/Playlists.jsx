@@ -1,221 +1,306 @@
+// src/pages/Playlists.jsx (This is your playlist *details* page)
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  getPlaylist, // Uses getPlaylist
+  updatePlaylistDetails,
+  deletePlaylist,
+  removeVideoFromPlaylist,
+} from "../services/playlistApi";
 import { useState, useEffect } from "react";
 import VideoListWithActions from "../components/VideoListWithActions";
 import { Button } from "../components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import CreateEditPlaylistModal from "../components/CreateEditPlaylistModal";
-import {
-  getPlaylist,
-  updatePlaylist,
-  deletePlaylist,
-  clearPlaylistVideos,
-  removeVideoFromPlaylist,
-} from "../services/playlistApi";
+import ProgressModal from "../components/ProgressModal";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 
 export default function Playlists() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { playlistId } = useParams();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
+
+  const [confirmDeletePlaylist, setConfirmDeletePlaylist] = useState(false);
+  const [playlistToDeleteTitle, setPlaylistToDeleteTitle] = useState("");
+
+  const [confirmRemoveVideoId, setConfirmRemoveVideoId] = useState(null);
+  const [videoToRemoveTitle, setVideoToRemoveTitle] = useState("");
+
   const [editMode, setEditMode] = useState(false);
-  const [editError, setEditError] = useState("");
-  const [editLoading, setEditLoading] = useState(false);
+  const [playlistToEditData, setPlaylistToEditData] = useState(null);
+
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [progressModalTitle, setProgressModalTitle] = useState("");
+  const [progressModalDescription, setProgressModalDescription] = useState("");
+  const [progressModalVariant, setProgressModalVariant] = useState("loading");
+
   const [showFullDesc, setShowFullDesc] = useState(false);
 
-  if (!user) {
-    navigate("/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    }
+  }, [user, navigate]);
 
   // Fetch playlist details
-  const { data, isLoading, isError } = useQuery({
+  const { data: playlistResponse, isLoading, isError, error, refetch: refetchPlaylist } = useQuery({ // Renamed data to playlistResponse
     queryKey: ["playlist", playlistId],
-    queryFn: () => getPlaylist(playlistId).then(res => res.data),
-    enabled: !!playlistId,
+    queryFn: async () => {
+      const res = await getPlaylist(playlistId);
+      return res.data; // Expecting { data: { playlist: {...} } } from ApiResponse
+    },
+    enabled: !!playlistId && !!user,
   });
-  const playlist = data?.data || {};
-  const videos = playlist.videos || [];
-  const isOwner = user && playlist.owner && user._id === playlist.owner;
+
+  // Access the playlist object correctly from the response
+  const playlist = playlistResponse?.playlist || {}; // Accessing .playlist key directly
+
+  const videos = Array.isArray(playlist.videos)
+    ? playlist.videos.map((v) => ({
+        ...v,
+        ownerDetails: v.videoOwnerDetails || v.ownerDetails || v.owner || {},
+      }))
+    : [];
+
+  const isOwner = user && playlist.owner && user._id === playlist.owner?._id;
 
   const descLimit = 80;
   const isLongDesc = (playlist.description || "").length > descLimit;
   const descToShow = showFullDesc || !isLongDesc ? playlist.description : (playlist.description || "").slice(0, descLimit) + "...";
 
-  // Mutations for delete and clear
-  const deleteMutation = useMutation({
+  // --- MUTATIONS ---
+
+  const deletePlaylistMutation = useMutation({
     mutationFn: () => deletePlaylist(playlistId),
+    onMutate: () => {
+      setConfirmDeletePlaylist(false);
+      setShowProgressModal(true);
+      setProgressModalTitle("Deleting Playlist...");
+      setProgressModalDescription("This playlist is being permanently removed.");
+      setProgressModalVariant("loading");
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(["playlist", playlistId]);
-      navigate("/profile");
+      queryClient.invalidateQueries(["allUserPlaylists", user?._id]);
+      queryClient.invalidateQueries(["userPlaylists", user?._id]);
+      setShowProgressModal(true);
+      setProgressModalTitle("Success!");
+      setProgressModalDescription("Playlist deleted successfully!");
+      setProgressModalVariant("success");
+      setTimeout(() => {
+        setShowProgressModal(false);
+        navigate("/playlists/all");
+      }, 2000);
+    },
+    onError: (err) => {
+      setShowProgressModal(true);
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(err?.response?.data?.message || "Failed to delete playlist.");
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error("Delete playlist failed:", err);
     },
   });
-  // Add/remove video to/from playlist , fix this
-  const toggleMutation = useMutation({
-    mutationFn: async ({ playlistId, checked }) => {
-      if (checked) {
-        const res = await api.patch(`/playlist/add/${videoId}/${playlistId}`);
-        return res;
-      } else {
-        const res = await api.patch(`/playlist/remove/${videoId}/${playlistId}`);
-        return res;
-      }
+
+  const updatePlaylistDetailsMutation = useMutation({
+    mutationFn: (updateData) => updatePlaylistDetails(playlistId, updateData),
+    onMutate: () => {
+      setEditMode(false);
+      setShowProgressModal(true);
+      setProgressModalTitle("Updating Playlist...");
+      setProgressModalDescription("Saving playlist details.");
+      setProgressModalVariant("loading");
     },
-    onSuccess: (res, { checked }) => {
-      queryClient.invalidateQueries(["userPlaylists", userId]);
-      if (checked && res?.status === 200) {
-        setToast("Video successfully added to playlist");
-        setTimeout(() => setToast(""), 2000);
-      }
-    },
-  });
-  const clearMutation = useMutation({
-    mutationFn: () => clearPlaylistVideos(playlistId),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["playlist", playlistId]);
-      setConfirmClear(false);
-    },
-  });
-  const removeMutation = useMutation({
-    mutationFn: (videoId) => removeVideoFromPlaylist(playlistId, videoId),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["playlist", playlistId]);
-    },
-  });
-  const handleEdit = ({ name, description }) => {
-    setEditLoading(true);
-    setEditError("");
-    updatePlaylist(playlistId, { name, description })
-      .then(() => {
-        setEditMode(false);
-        setEditLoading(false);
-        queryClient.invalidateQueries(["playlist", playlistId]);
-      })
-      .catch(err => {
-        setEditError(err?.response?.data?.message || "Failed to update playlist");
-        setEditLoading(false);
+    onSuccess: (res) => {
+      // Instead of refetching, update cache with new data
+      queryClient.setQueryData(["playlist", playlistId], (oldData) => {
+        return { ...oldData, data: { playlist: res.data.playlist } };
       });
+      queryClient.invalidateQueries(["allUserPlaylists", user?._id]);
+      queryClient.invalidateQueries(["userPlaylists", user?._id]);
+      setShowProgressModal(true);
+      setProgressModalTitle("Success!");
+      setProgressModalDescription("Playlist updated successfully!");
+      setProgressModalVariant("success");
+      setTimeout(() => setShowProgressModal(false), 2000);
+    },
+    onError: (err) => {
+      setShowProgressModal(true);
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(err?.response?.data?.message || "Failed to update playlist.");
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error("Update playlist failed:", err);
+    },
+  });
+
+  const removeVideoFromPlaylistMutation = useMutation({
+    mutationFn: (videoIdToRemove) => removeVideoFromPlaylist(videoIdToRemove, playlistId),
+    onMutate: () => {
+      setConfirmRemoveVideoId(null);
+      setShowProgressModal(true);
+      setProgressModalTitle("Removing Video...");
+      setProgressModalDescription("Removing video from playlist.");
+      setProgressModalVariant("loading");
+    },
+    onSuccess: (res) => {
+      // Update cache for current playlist to reflect video removal
+      queryClient.setQueryData(["playlist", playlistId], (oldData) => {
+        return { ...oldData, data: { playlist: res.data.playlist } };
+      });
+      setShowProgressModal(true);
+      setProgressModalTitle("Success!");
+      setProgressModalDescription("Video removed from playlist!");
+      setProgressModalVariant("success");
+      setTimeout(() => setShowProgressModal(false), 2000);
+    },
+    onError: (error) => {
+      setShowProgressModal(true);
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(error?.response?.data?.message || "Failed to remove video from playlist.");
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error("Remove video from playlist failed:", error);
+    },
+  });
+
+
+  // --- HANDLERS ---
+
+  const handleOpenEditModal = () => {
+    setPlaylistToEditData({ name: playlist.name, description: playlist.description });
+    setEditMode(true);
   };
 
+  const handleEditSubmit = (data) => {
+    updatePlaylistDetailsMutation.mutate(data);
+  };
+
+  const handleOpenDeletePlaylistConfirmation = () => {
+    setPlaylistToDeleteTitle(playlist.name);
+    setConfirmDeletePlaylist(true);
+  };
+
+  const handleRemoveVideoFromPlaylistClick = (videoId, videoTitle) => {
+    setConfirmRemoveVideoId(videoId);
+    setVideoToRemoveTitle(videoTitle);
+  };
+
+  const confirmVideoRemoval = () => {
+    if (confirmRemoveVideoId && playlistId) {
+      removeVideoFromPlaylistMutation.mutate(confirmRemoveVideoId);
+    }
+  };
+
+  if (isLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-xl text-muted-foreground">
+        Loading playlist...
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center text-destructive text-xl mt-20">
+        Error loading playlist: {error?.message || "Playlist not found or access denied."}
+      </div>
+    );
+  }
+
+  // Check if playlist._id exists after loading
+  if (!playlist._id) {
+    return (
+      <div className="text-center text-muted-foreground text-xl mt-20">
+        Playlist not found.
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto px-4 pb-4">
-      {isLoading && <div>Loading playlist...</div>}
-      {isError && <div className="text-destructive">Failed to load playlist.</div>}
-      {playlist && (
-        <>
-          {/* Custom sticky header as in the image */}
-          <div className="flex items-center justify-between gap-4 bg-background z-40 sticky top-0 py-4 border-b border-border">
-            <div className="flex flex-col min-w-0">
-              <div className="text-2xl font-bold text-card-foreground break-words">{playlist.name}</div>
-              <div className="text-muted-foreground text-base break-words max-w-2xl overflow-y-auto overflow-x-hidden">
-                {descToShow}
-                {isLongDesc && (
-                  <button
-                    className="ml-2 text-primary underline text-xs"
-                    onClick={() => setShowFullDesc(v => !v)}
-                  >
-                    {showFullDesc ? "View less" : "View more"}
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {isOwner && <Button size="icon" variant="ghost" onClick={() => setEditMode(true)}><Pencil className="w-5 h-5" /></Button>}
-              {isOwner && <Button size="icon" variant="destructive" onClick={() => setConfirmDelete(true)}><Trash2 className="w-5 h-5" /></Button>}
-              {isOwner && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setConfirmClear(true)}
-                  disabled={clearMutation.isLoading || videos.length === 0}
+    <div className="py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-0">
+        {/* Custom sticky header */}
+        <div className="flex items-center justify-between gap-4 bg-background z-40 sticky top-0 py-4 border-b border-border">
+          <div className="flex flex-col min-w-0">
+            <div className="text-2xl font-bold text-card-foreground break-words">{playlist.name}</div>
+            <div className="text-muted-foreground text-base break-words max-w-2xl overflow-y-auto overflow-x-hidden">
+              {descToShow}
+              {isLongDesc && (
+                <button
+                  className="ml-2 text-primary underline text-xs"
+                  onClick={() => setShowFullDesc((v) => !v)}
                 >
-                  Clear All
-                </Button>
+                  {showFullDesc ? "View less" : "View more"}
+                </button>
               )}
             </div>
           </div>
-
-          {/* Confirm Clear All Modal */}
-          {confirmClear && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-              <div className="bg-card border border-border rounded-lg p-6 max-w-sm w-full shadow-xl flex flex-col items-center">
-                <div className="text-lg font-semibold mb-4 text-card-foreground">Clear all?</div>
-                <div className="text-muted-foreground mb-6 text-center">This action cannot be undone.</div>
-                <div className="flex gap-4 w-full justify-center">
-                  <Button
-                    variant="destructive"
-                    onClick={() => clearMutation.mutate()}
-                    disabled={clearMutation.isLoading}
-                  >
-                    {clearMutation.isLoading ? "Clearing..." : "Yes, clear all"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setConfirmClear(false)}
-                    disabled={clearMutation.isLoading}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Video List With Actions */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden mt-4">
-            <VideoListWithActions
-              title={null}
-              videos={videos}
-              isLoading={isLoading}
-              isError={isError}
-              clearLoading={clearMutation.isLoading}
-              confirmOpen={confirmClear}
-              setConfirmOpen={setConfirmClear}
-              {...(isOwner ? { onRemove: videoId => removeMutation.mutate(videoId) } : {})}
-              emptyText="No videos in this playlist."
-            />
-          </div>
-
-          <CreateEditPlaylistModal
-            open={editMode}
-            onClose={() => { setEditMode(false); setEditError(""); }}
-            onSubmit={handleEdit}
-            loading={editLoading}
-            error={editError}
-            mode="edit"
-            initialName={playlist.name}
-            initialDescription={playlist.description}
-          />
-        </>
-      )}
-      {/* Delete confirmation */}
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-sm w-full shadow-xl flex flex-col items-center">
-            <div className="text-lg font-semibold mb-4 text-card-foreground">Delete this playlist?</div>
-            <div className="text-muted-foreground mb-6 text-center">This action cannot be undone.</div>
-            <div className="flex gap-4 w-full justify-center">
-              <Button
-                variant="destructive"
-                onClick={() => deleteMutation.mutate()}
-                disabled={deleteMutation.isLoading}
-              >
-                {deleteMutation.isLoading ? "Deleting..." : "Yes, delete"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setConfirmDelete(false)}
-                disabled={deleteMutation.isLoading}
-              >
-                Cancel
-              </Button>
-            </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {isOwner && (
+              <>
+                <Button size="icon" variant="ghost" onClick={handleOpenEditModal}>
+                  <Pencil className="w-5 h-5" />
+                </Button>
+                <Button size="icon" variant="destructive" onClick={handleOpenDeletePlaylistConfirmation}>
+                  <Trash2 className="w-5 h-5" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Video List With Actions */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden mt-4">
+          <VideoListWithActions
+            title={null}
+            videos={videos}
+            isLoading={isLoading}
+            isError={isError}
+            emptyText="No videos in this playlist."
+            {...(isOwner ? { onRemove: (videoId) => handleRemoveVideoFromPlaylistClick(videoId, videos.find((v) => v._id === videoId)?.title) } : {})}
+          />
+        </div>
+
+        <CreateEditPlaylistModal
+          open={editMode}
+          onClose={() => { setEditMode(false); }}
+          onSubmit={handleEditSubmit}
+          loading={updatePlaylistDetailsMutation.isLoading}
+          error={updatePlaylistDetailsMutation.isError ? (updatePlaylistDetailsMutation.error?.response?.data?.message || "Failed to update playlist") : ""}
+          mode="edit"
+          initialName={playlistToEditData?.name || playlist.name}
+          initialDescription={playlistToEditData?.description || playlist.description}
+        />
+      </div>
+
+      {/* Confirm Delete Playlist Modal */}
+      <ConfirmDeleteModal
+        open={confirmDeletePlaylist}
+        onClose={() => setConfirmDeletePlaylist(false)}
+        onConfirm={() => deletePlaylistMutation.mutate()}
+        isLoading={deletePlaylistMutation.isLoading}
+        videoTitle={playlistToDeleteTitle}
+      />
+
+      {/* Confirm Remove Video from Playlist Modal */}
+      <ConfirmDeleteModal
+        open={!!confirmRemoveVideoId}
+        onClose={() => setConfirmRemoveVideoId(null)}
+        onConfirm={confirmVideoRemoval}
+        isLoading={removeVideoFromPlaylistMutation.isLoading}
+        videoTitle={videoToRemoveTitle}
+      />
+
+      {/* Progress/Status Modal */}
+      <ProgressModal
+        open={showProgressModal}
+        title={progressModalTitle}
+        description={progressModalDescription}
+        variant={progressModalVariant}
+      />
     </div>
   );
-} 
+}

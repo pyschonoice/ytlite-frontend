@@ -1,11 +1,12 @@
 // src/pages/Profile.jsx
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, api } from "../services/api";
-import { createPlaylist } from "../services/playlistApi";
+// Ensure getUserPlaylists is imported from playlistApi
+import { createPlaylist, updatePlaylistDetails, deletePlaylist, getUserPlaylists } from "../services/playlistApi";
 import { useAuth } from "../contexts/AuthContext";
 import VideoCard from "../components/VideoCard";
 import VideoCardSkeleton from "../components/VideoCardSkeleton";
-import PlaylistCard from "../components/PlaylistCard";
+// import PlaylistCard from "../components/PlaylistCard"; // If this is for generic display, might not be needed
 import PlaylistCardSkeleton from "../components/PlaylistCardSkeleton";
 import TweetCard from "../components/TweetCard";
 import TweetCardSkeleton from "../components/TweetCardSkeleton";
@@ -16,12 +17,14 @@ import AvatarSkeleton from "../components/ui/AvatarSkeleton";
 import { Link, useNavigate } from "react-router-dom";
 import ProfileBanner from "../components/ProfileBanner";
 import SortAndActionBar from "../components/SortAndActionBar";
-import PlaylistModal from "../components/PlaylistModal";
 import CreateEditPlaylistModal from "../components/CreateEditPlaylistModal";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import EditVideoModal from "../components/EditVideoModal";
 import ProfileVideoCard from "../components/ProfileVideoCard";
-import ProgressModal from "../components/ProgressModal"; // NEW IMPORT
+// import ProfilePlaylistCard from "../components/ProfilePlaylistCard"; // Only needed if directly rendering cards
+import ProgressModal from "../components/ProgressModal";
+import PlaylistListDisplay from "../components/PlaylistListDisplay"; // Correct component for playlists tab
+
 
 const TABS = [
   { key: "videos", label: "Videos" },
@@ -39,34 +42,38 @@ export default function Profile() {
   const [videoSort, setVideoSort] = useState("desc");
   const [postSort, setPostSort] = useState("desc");
   const [playlistSort, setPlaylistSort] = useState("desc");
-  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createError, setCreateError] = useState("");
-  const [createLoading, setCreateLoading] = useState(false);
-  const navigate = useNavigate();
 
-  const [showDeleteModal, setShowDeleteModal] = useState(false); // For confirmation
+  const [showCreateEditPlaylistModal, setShowCreateEditPlaylistModal] = useState(false);
+  const [playlistModalMode, setPlaylistModalMode] = useState("create");
+  const [playlistToEdit, setPlaylistToEdit] = useState(null);
+
+  const [showDeleteVideoModal, setShowDeleteVideoModal] = useState(false);
   const [videoToDelete, setVideoToDelete] = useState(null);
 
-  // States for the new ProgressModal
+  const [showDeletePlaylistModal, setShowDeletePlaylistModal] = useState(false);
+  const [playlistToDelete, setPlaylistToDelete] = useState(null);
+
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [progressModalTitle, setProgressModalTitle] = useState("");
   const [progressModalDescription, setProgressModalDescription] = useState("");
   const [progressModalVariant, setProgressModalVariant] = useState("loading");
 
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditVideoModal, setShowEditVideoModal] = useState(false);
   const [videoToEdit, setVideoToEdit] = useState(null);
-  const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState(null);
-  const [editSuccess, setEditSuccess] = useState(null);
+  const [editVideoLoading, setEditVideoLoading] = useState(false);
+  const [editVideoError, setEditVideoError] = useState(null);
+  const [editVideoSuccess, setEditVideoSuccess] = useState(null);
+
+  const navigate = useNavigate();
 
 
+  // Fetch channel data (for profile banner and general user info)
   const { data: userData } = useQuery({
     queryKey: ["profile", username],
     queryFn: () => get(`/user/c/${username}`),
-    enabled: !!username,
+    enabled: !!username, // Only enable if username is available
   });
-  const userId = userData?.data?.channel?._id;
+  const userId = userData?.data?.channel?._id; // Get userId from the fetched channel data
 
   const { data: subsData, isLoading: loadingSubscribers } = useQuery({
     queryKey: ["subscribers", username],
@@ -76,18 +83,28 @@ export default function Profile() {
   const { data: videosData } = useQuery({
     queryKey: ["profileVideos", userId, videoSort],
     queryFn: () => get(`/video/?userId=${userId}&sortBy=createdAt&sortType=${videoSort}`),
-    enabled: !!userId,
+    enabled: !!userId, // Enable only if userId is available
   });
   const { data: tweetsData } = useQuery({
     queryKey: ["tweets", username, postSort],
     queryFn: () => get(`/tweet/c/${username}?sortBy=createdAt&sortType=${postSort}`),
     enabled: !!username,
   });
-  const { data: playlistsData } = useQuery({
-    queryKey: ["playlists", userId, playlistSort],
-    queryFn: () => get(`/playlist/user/${userId}?sortBy=createdAt&sortType=${playlistSort}`),
-
-    enabled: !!userId,
+  const {
+    data: playlistsData,
+    isLoading: playlistsLoading,
+    isError: playlistsError,
+    error: playlistsFetchError,
+  } = useQuery({
+    queryKey: ["userPlaylists", userId, playlistSort],
+    // Make sure userId is definitely available here before calling getUserPlaylists
+    queryFn: () => {
+        if (userId) { // Defensive check inside queryFn
+            return getUserPlaylists(userId);
+        }
+        throw new Error("User ID is not available for fetching playlists.");
+    },
+    enabled: !!userId, // Only enable if userId is available
   });
   const { data: subscribedData, isLoading: loadingSubscribed } = useQuery({
     queryKey: ["subscribedChannels", username],
@@ -98,27 +115,37 @@ export default function Profile() {
   const channel = userData?.data?.channel;
   const videos = videosData?.data?.videos || (Array.isArray(videosData?.data) ? videosData.data : []) || [];
   const tweets = tweetsData?.data?.tweets || tweetsData?.data || [];
-  const playlists = playlistsData?.data?.playlists || playlistsData?.data || [];
+  // Normalize playlists for the UI
+  // Assuming backend response is data.data.playlists or data.playlists directly
+  // Check the backend's getUserPlaylists controller output carefully.
+  const playlists = Array.isArray(playlistsData?.data?.playlists)
+    ? playlistsData.data.playlists.map(pl => ({
+        ...pl,
+        ownerDetails: pl.ownerDetails || pl.owner || {},
+        videoCount: pl.videos?.length || 0, // This relies on `videos` being an array of objects/IDs
+      }))
+    : (Array.isArray(playlistsData?.data) ? playlistsData.data.map(pl => ({
+        ...pl,
+        ownerDetails: pl.ownerDetails || pl.owner || {},
+        videoCount: pl.videos?.length || 0,
+      })) : []);
+
 
   const subscribers = subsData?.data?.subscribers || [];
   const subscribedChannels = subscribedData?.data?.channels || subscribedData?.data || [];
 
   const isOwnProfile = user && channel && user._id === channel._id;
 
-  // --- DELETE VIDEO LOGIC ---
+  // --- VIDEO DELETION LOGIC ---
   const deleteVideoMutation = useMutation({
     mutationFn: (videoId) => api.delete(`/video/${videoId}`),
     onMutate: async (deletedVideoId) => {
-      // 1. Close the initial confirmation modal
-      setShowDeleteModal(false);
-
-      // 2. Open the ProgressModal for loading feedback
+      setShowDeleteVideoModal(false);
       setProgressModalTitle("Deleting Video...");
       setProgressModalDescription("Please wait while the video is being permanently removed.");
       setProgressModalVariant("loading");
       setShowProgressModal(true);
 
-      // Optimistic update logic (as before)
       await queryClient.cancelQueries(["profileVideos", userId, videoSort]);
       const previousVideosData = queryClient.getQueryData(["profileVideos", userId, videoSort]);
       let currentVideosArray = [];
@@ -128,7 +155,6 @@ export default function Profile() {
           } else if (previousVideosData.videos) {
               currentVideosArray = previousVideosData.videos;
           } else if (previousVideosData.data && previousVideosData.data.videos) {
-              // FIX: Corrected typo from previousoposData to previousVideosData
               currentVideosArray = previousVideosData.data.videos;
           } else if (previousVideosData.data && Array.isArray(previousVideosData.data)) {
               currentVideosArray = previousVideosData.data;
@@ -151,67 +177,54 @@ export default function Profile() {
       return { previousVideosData };
     },
     onSuccess: () => {
-      // 3. Change ProgressModal to success state
       setProgressModalTitle("Success!");
       setProgressModalDescription("Video deleted successfully!");
       setProgressModalVariant("success");
-
-      queryClient.invalidateQueries(["profileVideos", userId]); // Refetch list
-      // Auto-close success message after a delay
+      queryClient.invalidateQueries(["profileVideos", userId]);
       setTimeout(() => {
-        setShowProgressModal(false); // Close progress modal
-        setVideoToDelete(null); // Clear selected video
-      }, 2000); // Display success for 2 seconds
+        setShowProgressModal(false);
+        setVideoToDelete(null);
+      }, 2000);
       console.log("Video deleted successfully!");
     },
     onError: (err, deletedVideoId, context) => {
-      // Rollback optimistic update
       if (context?.previousVideosData) {
         queryClient.setQueryData(["profileVideos", userId, videoSort], context.previousVideosData);
       }
-      // 3. Change ProgressModal to error state
       setProgressModalTitle("Error!");
       setProgressModalDescription(err?.response?.data?.message || "Failed to delete video.");
       setProgressModalVariant("error");
-
       console.error("Delete video failed:", err);
-      // Auto-close error message after a delay
       setTimeout(() => {
-        setShowProgressModal(false); // Close progress modal
-        setVideoToDelete(null); // Clear selected video
-      }, 3000); // Display error for 3 seconds
+        setShowProgressModal(false);
+        setVideoToDelete(null);
+      }, 3000);
     },
-    onSettled: () => {
-      // Nothing specific needed here, as success/error handle final closing
-    }
   });
 
   const onVideoDeleteClick = (video) => {
     setVideoToDelete(video);
-    setShowDeleteModal(true); // Open the confirmation modal
+    setShowDeleteVideoModal(true);
   };
 
-  const confirmDelete = () => {
-    // This is called when 'Delete' is clicked on ConfirmDeleteModal.
-    // It initiates the mutation, and onMutate will then handle closing ConfirmDeleteModal
-    // and opening ProgressModal.
+  const confirmVideoDelete = () => {
     if (videoToDelete) {
       deleteVideoMutation.mutate(videoToDelete._id);
     }
   };
 
-  // onEditSubmit and related states remain unchanged
+  // --- VIDEO EDIT LOGIC ---
   const onVideoEditClick = (video) => {
     setVideoToEdit(video);
-    setShowEditModal(true);
-    setEditError(null);
-    setEditSuccess(null);
+    setShowEditVideoModal(true);
+    setEditVideoError(null);
+    setEditVideoSuccess(null);
   };
 
-  const onEditSubmit = async ({ title, description, thumbnail, isPublic }) => {
-    setEditLoading(true);
-    setEditError(null);
-    setEditSuccess(null);
+  const onEditVideoSubmit = async ({ title, description, thumbnail, isPublic }) => {
+    setEditVideoLoading(true);
+    setEditVideoError(null);
+    setEditVideoSuccess(null);
     try {
       const formData = new FormData();
       formData.append("title", title);
@@ -220,175 +233,258 @@ export default function Profile() {
       if (thumbnail) {
         formData.append("thumbnail", thumbnail);
       }
-
       await api.patch(`/video/${videoToEdit._id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
-      setEditSuccess("Video updated successfully!");
+      setEditVideoSuccess("Video updated successfully!");
       queryClient.invalidateQueries(["profileVideos", userId]);
       queryClient.invalidateQueries(["video", videoToEdit._id]);
       setTimeout(() => {
-        setShowEditModal(false);
+        setShowEditVideoModal(false);
         setVideoToEdit(null);
       }, 1000);
     } catch (err) {
-      setEditError(err?.response?.data?.message || "Failed to update video");
+      setEditVideoError(err?.response?.data?.message || "Failed to update video");
       console.error("Edit video failed:", err);
     } finally {
-      setEditLoading(false);
+      setEditVideoLoading(false);
+    }
+  };
+
+
+  // --- PLAYLIST CREATE/EDIT LOGIC (for profile page's "Create Playlist" button) ---
+  const createEditPlaylistMutation = useMutation({
+    mutationFn: async (data) => {
+      if (playlistModalMode === "create") {
+        return createPlaylist(data);
+      } else if (playlistModalMode === "edit" && playlistToEdit) {
+        return updatePlaylistDetails(playlistToEdit._id, data);
+      }
+      throw new Error("Invalid mode for playlist operation.");
+    },
+    onMutate: () => {
+      setShowCreateEditPlaylistModal(false);
+      setProgressModalTitle(playlistModalMode === "create" ? "Creating Playlist..." : "Saving Playlist...");
+      setProgressModalDescription(
+        playlistModalMode === "create"
+          ? "Please wait while your new playlist is being created."
+          : "Please wait while your playlist changes are being saved."
+      );
+      setProgressModalVariant("loading");
+      setShowProgressModal(true);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["userPlaylists", userId]);
+      queryClient.invalidateQueries(["allUserPlaylists", user?._id]); // Invalidate for AllUserPlaylists page too
+      setProgressModalTitle(playlistModalMode === "create" ? "Success!" : "Saved!");
+      setProgressModalDescription(
+        playlistModalMode === "create" ? "Playlist created successfully!" : "Playlist updated successfully!"
+      );
+      setProgressModalVariant("success");
+      setPlaylistToEdit(null);
+      setTimeout(() => setShowProgressModal(false), 2000);
+    },
+    onError: (err) => {
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(err?.response?.data?.message || `Failed to ${playlistModalMode} playlist.`);
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error(`${playlistModalMode} playlist failed:`, err);
+    },
+  });
+
+  const handleCreateEditPlaylistSubmit = (data) => {
+    createEditPlaylistMutation.mutate(data);
+  };
+
+  const handleOpenCreatePlaylistModal = () => {
+    setPlaylistModalMode("create");
+    setPlaylistToEdit(null);
+    setShowCreateEditPlaylistModal(true);
+  };
+
+  const handleOpenEditPlaylistModal = (playlist) => {
+    setPlaylistModalMode("edit");
+    setPlaylistToEdit(playlist);
+    setShowCreateEditPlaylistModal(true);
+  };
+
+
+  // --- PLAYLIST DELETION LOGIC ---
+  const deletePlaylistMutation = useMutation({
+    mutationFn: (playlistId) => deletePlaylist(playlistId),
+    onMutate: () => {
+      setShowDeletePlaylistModal(false);
+      setProgressModalTitle("Deleting Playlist...");
+      setProgressModalDescription("Please wait while the playlist is being permanently removed.");
+      setProgressModalVariant("loading");
+      setShowProgressModal(true);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["userPlaylists", userId]);
+      queryClient.invalidateQueries(["allUserPlaylists", user?._id]); // Invalidate for AllUserPlaylists page too
+      setProgressModalTitle("Success!");
+      setProgressModalDescription("Playlist deleted successfully!");
+      setProgressModalVariant("success");
+      setPlaylistToDelete(null);
+      setTimeout(() => setShowProgressModal(false), 2000);
+    },
+    onError: (err) => {
+      setProgressModalTitle("Error!");
+      setProgressModalDescription(err?.response?.data?.message || "Failed to delete playlist.");
+      setProgressModalVariant("error");
+      setTimeout(() => setShowProgressModal(false), 3000);
+      console.error("Delete playlist failed:", err);
+    },
+  });
+
+  const handleOpenDeletePlaylistModal = (playlist) => {
+    setPlaylistToDelete(playlist);
+    setShowDeletePlaylistModal(true);
+  };
+
+  const confirmPlaylistDelete = () => {
+    if (playlistToDelete) {
+      deletePlaylistMutation.mutate(playlistToDelete._id);
     }
   };
 
 
   return (
-    <div className="py-8 px-4 max-w-7xl mx-auto">
-      <ProfileBanner
-        channel={channel}
-        userDataLoading={userData?.isLoading}
-        subscribersCount={subscribers.length}
-        videosCount={videos.length}
-      />
-      <div className="mb-6 border-b border-border flex gap-6 px-6 overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`py-3 px-4 font-semibold text-base transition-colors border-b-2 ${tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <div className="px-2 sm:px-6 flex flex-col gap-10">
-        {tab === "videos" && (
-          <>
-            <SortAndActionBar
-              sortOrder={videoSort}
-              onSortChange={setVideoSort}
-              actionLabel={"+ Upload"}
-              actionIcon={<Video className="w-5 h-5" />}
-              onAction={() => (window.location.href = "/upload")}
-            />
-            <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-8">
-              {videosData?.isLoading
-                ? Array.from({ length: 5 }).map((_, i) => <VideoCardSkeleton key={i} />)
-                : videos.map((video) => (
-                  isOwnProfile ? (
-                    <ProfileVideoCard
-                      key={video._id}
-                      video={video}
-                      onEdit={onVideoEditClick}
-                      onDelete={onVideoDeleteClick}
-                    />
-                  ) : (
-                    <VideoCard key={video._id} video={video} />
-                  )
-                ))}
+    <div className="py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-0"> {/* Added new wrapper for content centering */}
+        <ProfileBanner
+          channel={channel}
+          userDataLoading={userData?.isLoading}
+          subscribersCount={subscribers.length}
+          videosCount={videos.length}
+        />
+        <div className="mb-6 border-b border-border flex gap-6 px-6 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`py-3 px-4 font-semibold text-base transition-colors border-b-2 ${tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="px-2 sm:px-6 flex flex-col gap-10">
+          {tab === "videos" && (
+            <>
+              <SortAndActionBar
+                sortOrder={videoSort}
+                onSortChange={setVideoSort}
+                actionLabel={"+ Upload"}
+                actionIcon={<Video className="w-5 h-5" />}
+                onAction={() => (window.location.href = "/upload")}
+              />
+              <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mb-8">
+                {videosData?.isLoading
+                  ? Array.from({ length: 5 }).map((_, i) => <VideoCardSkeleton key={i} />)
+                  : videos.map((video) => (
+                    isOwnProfile ? (
+                      <ProfileVideoCard
+                        key={video._id}
+                        video={video}
+                        onEdit={onVideoEditClick}
+                        onDelete={onVideoDeleteClick}
+                      />
+                    ) : (
+                      <VideoCard key={video._id} video={video} />
+                    )
+                  ))}
+              </div>
+            </>
+          )}
+          {tab === "posts" && (
+            <>
+              <SortAndActionBar
+                sortOrder={postSort}
+                onSortChange={setPostSort}
+                actionLabel={"+ Post"}
+                actionIcon={<Pencil className="w-5 h-5" />}
+                onAction={() => alert("Create Post coming soon!")}
+              />
+              <div className="mb-8 px-2 max-w-2xl mx-auto flex flex-col gap-8">
+                {tweetsData?.isLoading
+                  ? Array.from({ length: 3 }).map((_, i) => <TweetCardSkeleton key={i} />)
+                  : tweets.map((tweet) => <TweetCard key={tweet._id} tweet={tweet} />)}
+              </div>
+            </>
+          )}
+          {tab === "playlists" && (
+            <>
+              <SortAndActionBar
+                sortOrder={playlistSort}
+                onSortChange={setPlaylistSort}
+                actionLabel={"+ Create"}
+                actionIcon={<List className="w-5 h-5" />}
+                onAction={handleOpenCreatePlaylistModal}
+              />
+              <PlaylistListDisplay
+                playlists={playlists}
+                isLoading={playlistsLoading}
+                isError={playlistsError}
+                errorMessage={playlistsFetchError?.message || ""}
+                emptyText="No playlists yet."
+                onEditPlaylist={handleOpenEditPlaylistModal}
+                onDeletePlaylist={handleOpenDeletePlaylistModal}
+              />
+            </>
+          )}
+          {tab === "subscribed" && (
+            <div className="flex flex-col gap-4 mb-8">
+              {loadingSubscribed
+                ? Array.from({ length: 5 }).map((_, i) => <AvatarSkeleton key={i} size="lg" />)
+                : (subscribedChannels.length === 0 ? <div className="text-muted-foreground">No subscriptions yet.</div> :
+                  subscribedChannels.map((ch) => (
+                    <Link key={ch._id} to={`/channel/${ch.username}`} className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition">
+                      <Avatar user={ch} size="lg" />
+                      <div>
+                        <div className="font-semibold text-card-foreground">{ch.fullName || ch.username}</div>
+                        <div className="text-muted-foreground text-sm">@{ch.username}</div>
+                      </div>
+                    </Link>
+                  )))}
             </div>
-          </>
-        )}
-        {tab === "posts" && (
-          <>
-            <SortAndActionBar
-              sortOrder={postSort}
-              onSortChange={setPostSort}
-              actionLabel={"+ Post"}
-              actionIcon={<Pencil className="w-5 h-5" />}
-              onAction={() => alert("Create Post coming soon!")}
-            />
-            <div className="mb-8 px-2 max-w-2xl mx-auto flex flex-col gap-8">
-              {tweetsData?.isLoading
-                ? Array.from({ length: 3 }).map((_, i) => <TweetCardSkeleton key={i} />)
-                : tweets.map((tweet) => <TweetCard key={tweet._id} tweet={tweet} />)}
+          )}
+          {tab === "subscribers" && (
+            <div className="flex flex-col gap-4 mb-8">
+              {loadingSubscribers
+                ? Array.from({ length: 5 }).map((_, i) => <AvatarSkeleton key={i} size="lg" />)
+                : (subscribers.length === 0 ? <div className="text-muted-foreground">No subscribers yet.</div> :
+                  subscribers.map((ch) => (
+                    <Link key={ch._id} to={`/channel/${ch.username}`} className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition">
+                      <Avatar user={ch} size="lg" />
+                      <div>
+                        <div className="font-semibold text-card-foreground">{ch.fullName || ch.username}</div>
+                        <div className="text-muted-foreground text-sm">@{ch.username}</div>
+                      </div>
+                    </Link>
+                  )))}
             </div>
-          </>
-        )}
-        {tab === "playlists" && (
-          <>
-            <SortAndActionBar
-              sortOrder={playlistSort}
-              onSortChange={setPlaylistSort}
-              actionLabel={"+ Create"}
-              actionIcon={<List className="w-5 h-5" />}
-              onAction={() => setShowCreateModal(true)}
-            />
-            <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {playlistsData?.isLoading
-                ? Array.from({ length: 3 }).map((_, i) => <PlaylistCardSkeleton key={i} />)
-                : playlists.map((playlist) => (
-                  <PlaylistCard
-                    key={playlist._id}
-                    playlist={playlist}
-                    onClick={() => navigate(`/playlist/${playlist._id}`)}
-                    className="cursor-pointer"
-                  />
-                ))}
-            </div>
-            <CreateEditPlaylistModal
-              open={showCreateModal}
-              onClose={() => { setShowCreateModal(false); setCreateError(""); }}
-              onSubmit={({ name, description }) => {
-                setCreateLoading(true);
-                setCreateError("");
-                createPlaylist({ name, description })
-                  .then(() => {
-                    setShowCreateModal(false);
-                    setCreateLoading(false);
-                    playlistsData.refetch && playlistsData.refetch();
-                  })
-                  .catch(err => {
-                    setCreateError(err?.response?.data?.message || "Failed to create playlist");
-                    setCreateLoading(false);
-                  });
-              }}
-              loading={createLoading}
-              error={createError}
-              mode="create"
-            />
-          </>
-        )}
-        {tab === "subscribed" && (
-          <div className="flex flex-col gap-4 mb-8">
-            {loadingSubscribed
-              ? Array.from({ length: 5 }).map((_, i) => <AvatarSkeleton key={i} size="lg" />)
-              : (subscribedChannels.length === 0 ? <div className="text-muted-foreground">No subscriptions yet.</div> :
-                subscribedChannels.map((ch) => (
-                  <Link key={ch._id} to={`/channel/${ch.username}`} className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition">
-                    <Avatar user={ch} size="lg" />
-                    <div>
-                      <div className="font-semibold text-card-foreground">{ch.fullName || ch.username}</div>
-                      <div className="text-muted-foreground text-sm">@{ch.username}</div>
-                    </div>
-                  </Link>
-                )))}
-          </div>
-        )}
-        {tab === "subscribers" && (
-          <div className="flex flex-col gap-4 mb-8">
-            {loadingSubscribers
-              ? Array.from({ length: 5 }).map((_, i) => <AvatarSkeleton key={i} size="lg" />)
-              : (subscribers.length === 0 ? <div className="text-muted-foreground">No subscribers yet.</div> :
-                subscribers.map((ch) => (
-                  <Link key={ch._id} to={`/channel/${ch.username}`} className="flex items-center gap-4 p-3 border border-border rounded-lg bg-card hover:shadow transition">
-                    <Avatar user={ch} size="lg" />
-                    <div>
-                      <div className="font-semibold text-card-foreground">{ch.fullName || ch.username}</div>
-                      <div className="text-muted-foreground text-sm">@{ch.username}</div>
-                    </div>
-                  </Link>
-                )))}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Confirmation Modal for Video Delete */}
       <ConfirmDeleteModal
-        open={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)} // User clicks Cancel or outside
-        onConfirm={confirmDelete} // User clicks Delete, initiates mutation
-        isLoading={deleteVideoMutation.isLoading} // To disable buttons if mutation has started
+        open={showDeleteVideoModal}
+        onClose={() => setShowDeleteVideoModal(false)}
+        onConfirm={confirmVideoDelete}
+        isLoading={deleteVideoMutation.isLoading}
         videoTitle={videoToDelete?.title}
+      />
+
+      {/* Confirmation Modal for Playlist Delete */}
+      <ConfirmDeleteModal
+        open={showDeletePlaylistModal}
+        onClose={() => setShowDeletePlaylistModal(false)}
+        onConfirm={confirmPlaylistDelete}
+        isLoading={deletePlaylistMutation.isLoading}
+        videoTitle={playlistToDelete?.name || "this playlist"}
       />
 
       {/* Progress/Status Modal */}
@@ -402,15 +498,27 @@ export default function Profile() {
       {/* Edit Video Modal */}
       {videoToEdit && (
         <EditVideoModal
-          open={showEditModal}
-          onClose={() => setShowEditModal(false)}
+          open={showEditVideoModal}
+          onClose={() => setShowEditVideoModal(false)}
           video={videoToEdit}
-          onSubmit={onEditSubmit}
-          isLoading={editLoading}
-          error={editError}
-          success={editSuccess}
+          onSubmit={onEditVideoSubmit}
+          isLoading={editVideoLoading}
+          error={editVideoError}
+          success={editVideoSuccess}
         />
       )}
+
+      {/* Create/Edit Playlist Modal for Profile Page */}
+      <CreateEditPlaylistModal
+        open={showCreateEditPlaylistModal}
+        onClose={() => { setShowCreateEditPlaylistModal(false); setPlaylistToEdit(null); }}
+        onSubmit={handleCreateEditPlaylistSubmit}
+        loading={createEditPlaylistMutation.isLoading}
+        error={createEditPlaylistMutation.isError ? (createEditPlaylistMutation.error?.response?.data?.message || "Operation failed") : ""}
+        mode={playlistModalMode}
+        initialName={playlistToEdit?.name || ""}
+        initialDescription={playlistToEdit?.description || ""}
+      />
     </div>
   );
 }

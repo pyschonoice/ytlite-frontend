@@ -1,10 +1,10 @@
+// src/components/PlaylistModal.jsx
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { get, api } from "../services/api";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Lock, Globe, Plus, X, CheckCircle2, Loader2 } from "lucide-react";
 import CreateEditPlaylistModal from "./CreateEditPlaylistModal";
-import { getUserPlaylists, createPlaylist } from "../services/playlistApi";
+import { getUserPlaylists, createPlaylist, addVideoToPlaylist, removeVideoFromPlaylist } from "../services/playlistApi"; // Ensure add/remove are imported
 
 export default function PlaylistModal({ open, onClose, videoId, userId }) {
   const queryClient = useQueryClient();
@@ -16,33 +16,58 @@ export default function PlaylistModal({ open, onClose, videoId, userId }) {
   // Fetch all playlists for the user
   const { data, isLoading } = useQuery({
     queryKey: ["userPlaylists", userId],
-    queryFn: () => getUserPlaylists(userId).then(res => res.data.data),
+    // --- FIX START ---
+    // Assuming getUserPlaylists returns { data: { playlists: [...] } } or { playlists: [...] }
+    queryFn: async () => {
+      const response = await getUserPlaylists(userId);
+      // Depending on your ApiResponse structure, it might be response.data.playlists
+      // or response.playlists directly if ApiResponse wraps it with just {playlists: ...}
+      // Let's assume it's response.data.playlists as commonly seen with nested API structures.
+      // If response.data is directly the array, use `response.data`
+      if (response && response.data && Array.isArray(response.data.playlists)) {
+        return response.data.playlists;
+      }
+      // If response.data is directly the array (no 'playlists' key)
+      if (response && Array.isArray(response.data)) {
+         return response.data;
+      }
+      // Fallback to empty array if data structure is unexpected, but avoid 'undefined'
+      return [];
+    },
+    // --- FIX END ---
     enabled: open && !!userId,
   });
-  const playlists = Array.isArray(data?.playlists) ? data.playlists : [];
+  // The 'data' returned by useQuery will now be the array of playlists, or an empty array
+  const playlists = Array.isArray(data) ? data : [];
 
-  // Fetch playlist details for this video (which playlists contain this video)
-  // We'll fetch all playlists and check if videoId is in each playlist's videos array
-  // (Assumes playlist.videos is an array of video IDs)
 
   // Add/remove video to/from playlist
   const toggleMutation = useMutation({
     mutationFn: async ({ playlistId, checked }) => {
       if (checked) {
-        const res = await api.patch(`/playlist/add/${videoId}/${playlistId}`);
+        // Use the specific addVideoToPlaylist API function
+        const res = await addVideoToPlaylist(videoId, playlistId);
         return res;
       } else {
-        const res = await api.patch(`/playlist/remove/${videoId}/${playlistId}`);
+        // Use the specific removeVideoFromPlaylist API function
+        const res = await removeVideoFromPlaylist(videoId, playlistId);
         return res;
       }
     },
     onSuccess: (res, { checked }) => {
-      queryClient.invalidateQueries(["userPlaylists", userId]);
-      if (checked && res?.status === 200) {
+      queryClient.invalidateQueries(["userPlaylists", userId]); // Invalidate for this modal
+      queryClient.invalidateQueries(["playlist", res.data?.data?._id || null]); // Invalidate specific playlist if ID is returned
+      queryClient.invalidateQueries(["allUserPlaylists", userId]); // Invalidate for all user playlists page
+      if (checked) { // Only show toast if video was added
         setToast("Video successfully added to playlist");
         setTimeout(() => setToast(""), 2000);
       }
     },
+    onError: (err) => {
+        console.error("Failed to toggle playlist status:", err);
+        setToast(err?.response?.data?.message || "Failed to update playlist");
+        setTimeout(() => setToast(""), 3000);
+    }
   });
 
   const handleCreate = ({ name, description }) => {
@@ -52,7 +77,8 @@ export default function PlaylistModal({ open, onClose, videoId, userId }) {
       .then(() => {
         setShowCreateModal(false);
         setCreateLoading(false);
-        queryClient.invalidateQueries(["userPlaylists", userId]);
+        queryClient.invalidateQueries(["userPlaylists", userId]); // Refresh playlists list in modal
+        queryClient.invalidateQueries(["allUserPlaylists", userId]); // Refresh all playlists page
       })
       .catch(err => {
         setCreateError(err?.response?.data?.message || "Failed to create playlist");
@@ -73,10 +99,11 @@ export default function PlaylistModal({ open, onClose, videoId, userId }) {
           </div>
           <div className="flex-1 overflow-y-auto max-h-[60vh] flex flex-col gap-1 px-2 py-2 custom-scrollbar">
             {isLoading ? (
-              <div className="text-center text-muted-foreground py-8">Loading...</div>
+              <div className="text-center text-muted-foreground py-8">Loading playlists...</div>
             ) : (
               playlists.map((pl) => {
-                const checked = Array.isArray(pl.videos) && pl.videos.includes(videoId);
+                // Ensure pl.videos is an array of video IDs if your backend returns it that way
+                const checked = Array.isArray(pl.videos) && pl.videos.some(video => video._id === videoId || video === videoId); // Check by ID or direct ID
                 return (
                   <label key={pl._id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/60 cursor-pointer transition">
                     <input
@@ -126,4 +153,4 @@ export default function PlaylistModal({ open, onClose, videoId, userId }) {
       />
     </>
   );
-} 
+}
