@@ -4,6 +4,7 @@ import PlaylistCardSkeleton from "./PlaylistCardSkeleton";
 import { Button } from "./ui/button";
 import { Plus } from "lucide-react";
 
+
 export default function PlaylistListDisplay({
   title,
   playlists = [],
@@ -51,6 +52,7 @@ export default function PlaylistListDisplay({
       {!isLoading && !isError && playlists.length > 0 && (
         <div className="grid gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 mt-4">
           {playlists.map((playlist) => (
+            
             <ProfilePlaylistCard
               key={playlist._id}
               playlist={playlist}

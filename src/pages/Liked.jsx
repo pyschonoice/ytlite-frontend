@@ -8,8 +8,6 @@ import VideoListWithActions from "../components/VideoListWithActions";
 export default function Liked() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   if (!user) {
     navigate("/login");
@@ -31,28 +29,9 @@ export default function Liked() {
         ownerDetails: v.videoOwnerDetails || v.ownerDetails || v.owner || {},
       }))
     : [];
+    console.log(videos)
 
-  // Mutation to remove a video from liked
-  const removeMutation = useMutation({
-    // The endpoint for removing a liked video should be `/like/:videoId`
-    // assuming it's a DELETE request to unlike a video.
-    // If your backend uses `/user/liked/:videoId` for unliking, keep it.
-    // Based on common REST patterns, `/like/:videoId` is more typical for actions on 'like' resource.
-    mutationFn: (videoId) => api.delete(`/like/${videoId}`), // Assuming this is the correct unlike endpoint
-    onSuccess: () => {
-      queryClient.invalidateQueries(["likedVideos"]);
-    },
-  });
-
-  // Mutation to clear all liked videos
-  const clearMutation = useMutation({
-    // Assuming this is the correct endpoint to clear all liked videos.
-    mutationFn: () => api.delete("/like/videos"),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["likedVideos"]);
-      setConfirmOpen(false);
-    },
-  });
+  
 
   return (
     <VideoListWithActions

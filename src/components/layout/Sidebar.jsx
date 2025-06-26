@@ -46,13 +46,14 @@ export default function Sidebar({ collapsed, isMobileOpen, onCloseMobile }) {
           "fixed top-16 left-0 h-[calc(100vh-4rem)] bg-sidebar border-r border-sidebar-border z-50 overflow-y-auto transition-all duration-200",
           "font-sans", // Apply the font family here
           "hidden lg:block",
+          "text-lg",
           {
             "w-64": !collapsed,
             "w-20": collapsed,
           }
         )}
       >
-        <nav className="flex flex-col p-2 space-y-1">
+        <nav className="flex flex-col p-3 space-y-2">
           {navItems.map((item) => (
             <NavLink
               key={item.name}
@@ -61,40 +62,19 @@ export default function Sidebar({ collapsed, isMobileOpen, onCloseMobile }) {
                 cn(
                   "flex items-center rounded-md px-3 py-2 transition-colors",
                   "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  isActive &&
-                    "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+                  
                 )
               }
             >
               <item.icon
-                className={cn("shrink-0", { "size-5": !collapsed, "size-6": collapsed })}
+                className={cn("shrink-0", { "size-6": !collapsed, "size-6": collapsed })}
               />
               {!collapsed && (
-                <span className="ml-3 text-sm font-medium">{item.name}</span>
+                <span className="ml-3 text-sm">{item.name}</span>
               )}
             </NavLink>
           ))}
-          {user && (
-            <Button
-              variant="ghost"
-              className={cn(
-                "flex items-center justify-start rounded-md px-3 py-2 transition-colors",
-                "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                { "w-full": !collapsed, "w-auto": collapsed }
-              )}
-              onClick={() => {
-                logout();
-                if (isMobileOpen) onCloseMobile();
-              }}
-            >
-              <LogoutIcon
-                className={cn("shrink-0", { "size-5": !collapsed, "size-6": collapsed })}
-              />
-              {!collapsed && (
-                <span className="ml-3 text-sm font-medium">Logout</span>
-              )}
-            </Button>
-          )}
+         
         </nav>
       </aside>
 
@@ -127,19 +107,7 @@ export default function Sidebar({ collapsed, isMobileOpen, onCloseMobile }) {
               <span className="ml-3 text-sm font-medium">{item.name}</span>
             </NavLink>
           ))}
-          {user && (
-            <Button
-              variant="ghost"
-              className="flex items-center justify-start rounded-md px-3 py-2 transition-colors text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground w-full"
-              onClick={() => {
-                logout();
-                onCloseMobile();
-              }}
-            >
-              <LogoutIcon className="size-5 shrink-0" />
-              <span className="ml-3 text-sm font-medium">Logout</span>
-            </Button>
-          )}
+          
         </nav>
       </aside>
     </>

@@ -118,19 +118,18 @@ export default function Profile() {
   // Normalize playlists for the UI
   // Assuming backend response is data.data.playlists or data.playlists directly
   // Check the backend's getUserPlaylists controller output carefully.
-  const playlists = Array.isArray(playlistsData?.data?.playlists)
+  
+  const playlists = Array.isArray(playlistsData?.data?.playlists) // If backend nests under data.playlists
     ? playlistsData.data.playlists.map(pl => ({
+       
         ...pl,
-        ownerDetails: pl.ownerDetails || pl.owner || {},
-        videoCount: pl.videos?.length || 0, // This relies on `videos` being an array of objects/IDs
+        ownerDetails: pl.ownerDetails || pl.owner || user || {},
+        videoCount: pl.videoCount || 0, // This relies on `videos` being an array of objects/IDs
       }))
-    : (Array.isArray(playlistsData?.data) ? playlistsData.data.map(pl => ({
-        ...pl,
-        ownerDetails: pl.ownerDetails || pl.owner || {},
-        videoCount: pl.videos?.length || 0,
-      })) : []);
+    :[]
 
 
+  
   const subscribers = subsData?.data?.subscribers || [];
   const subscribedChannels = subscribedData?.data?.channels || subscribedData?.data || [];
 
@@ -475,16 +474,18 @@ export default function Profile() {
         onClose={() => setShowDeleteVideoModal(false)}
         onConfirm={confirmVideoDelete}
         isLoading={deleteVideoMutation.isLoading}
-        videoTitle={videoToDelete?.title}
+        title={"Delete Video"}
+        description={`Are you sure you want to delete "${videoToDelete?.title}"? This action cannot be undone and the video will be permanently removed.`}
       />
-
+  
       {/* Confirmation Modal for Playlist Delete */}
       <ConfirmDeleteModal
         open={showDeletePlaylistModal}
         onClose={() => setShowDeletePlaylistModal(false)}
         onConfirm={confirmPlaylistDelete}
-        isLoading={deletePlaylistMutation.isLoading}
-        videoTitle={playlistToDelete?.name || "this playlist"}
+        title={"Delete Playlist"}
+        description={`Are you sure you want to delete "${playlistToDelete?.name || "this playlist"}"? This action cannot be undone and the playlist will be permanently removed.`}
+        
       />
 
       {/* Progress/Status Modal */}

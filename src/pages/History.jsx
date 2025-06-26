@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { get, api } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import VideoCard from "../components/VideoCard";
-import VideoCardSkeleton from "../components/VideoCardSkeleton";
+
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { X } from "lucide-react";

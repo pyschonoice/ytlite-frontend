@@ -3,9 +3,9 @@ import { Pencil, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import Avatar from "./ui/Avatar";
-import { formatTimeAgo } from "../lib/utils"; // Only need formatTimeAgo
-import { useQuery } from "@tanstack/react-query"; // Import useQuery
-import { get } from "../services/api"; // Import get for video details
+import { formatTimeAgo } from "../lib/utils";
+// REMOVED: import { useQuery } from "@tanstack/react-query";
+// REMOVED: import { get } from "../services/api";
 
 export default function ProfilePlaylistCard({ playlist, onEdit, onDelete, className = "" }) {
   if (!playlist) return null;
@@ -13,17 +13,10 @@ export default function ProfilePlaylistCard({ playlist, onEdit, onDelete, classN
   const navigate = useNavigate();
   const owner = playlist.ownerDetails || playlist.owner;
 
-  // --- NEW: Fetch thumbnail for the first video if playlist.videos contains IDs ---
-  const firstVideoId = playlist.videos?.[0]; // Get the ID of the first video
-  const { data: firstVideoData } = useQuery({
-    queryKey: ["firstPlaylistVideoThumbnail", firstVideoId],
-    queryFn: () => get(`/video/${firstVideoId}`), // Fetch full video details
-    enabled: !!firstVideoId, // Only enable if there's a video ID
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-    select: (data) => data?.data?.thumbnail?.url, // Select only the thumbnail URL
-  });
-
-  const thumbnailToDisplay = firstVideoData || null; // firstVideoData will be the URL if successful
+  // --- FIXED: Directly access populated video thumbnail and count ---
+  // Assuming playlist.videos is already populated by getUserPlaylists on the backend.
+  // If it's NOT populated, the backend needs fixing, or a different (less efficient) strategy is required.
+  const firstVideoThumbnail = playlist.videos?.[0]?.thumbnail?.url;
   const placeholderText = "Add video to get thumbnail";
 
   return (
@@ -77,9 +70,9 @@ export default function ProfilePlaylistCard({ playlist, onEdit, onDelete, classN
         className="block h-full w-full"
       >
         <div className="aspect-video bg-muted overflow-hidden relative">
-          {thumbnailToDisplay ? ( // Use the fetched thumbnail
+          {firstVideoThumbnail ? ( // Use the directly available thumbnail
             <img
-              src={thumbnailToDisplay}
+              src={firstVideoThumbnail}
               alt={playlist.name || "Playlist thumbnail"}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
             />
@@ -89,7 +82,7 @@ export default function ProfilePlaylistCard({ playlist, onEdit, onDelete, classN
             </div>
           )}
           <span className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-0.5 rounded">
-            {playlist.videoCount} videos
+            {playlist.videoCount} videos {/* playlist.videoCount should be accurate from backend */}
           </span>
         </div>
         <div className="p-3 flex flex-col gap-2">

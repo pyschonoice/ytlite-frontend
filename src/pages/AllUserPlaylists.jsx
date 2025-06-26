@@ -60,7 +60,7 @@ export default function AllUserPlaylists() {
     ? playlistsData.data.playlists.map(pl => ({
         ...pl,
         ownerDetails: pl.ownerDetails || pl.owner || user || {},
-        videoCount: pl.videos?.length || 0, // This relies on `videos` being an array of objects/IDs
+        videoCount: pl.videoCount || 0, // This relies on `videos` being an array of objects/IDs
       }))
     : (Array.isArray(playlistsData?.data) ? playlistsData.data.map(pl => ({ // If backend directly returns array in data
         ...pl,
