@@ -27,15 +27,11 @@ export function AuthProvider({ children }) {
         } else {
           // If response is successful but data is null/empty, means no active user
           setUser(null);
-        }
+        } 
       } catch (e) {
-        // This catch block handles cases where getCurrentUser throws an error (e.g., 401 Unauthorized)
-        console.error("Failed to fetch current user during session restore:", e);
+        
         setUser(null); // Explicitly set user to null on error
-        // Important: If this error often happens for expired tokens, ensure your API's
-        // interceptors or the getCurrentUser logic handles refreshing tokens
-        // *before* it throws an error to the context, if that's your desired flow.
-        // Otherwise, simply setting user to null is correct for unauthenticated.
+       
       } finally {
         setIsLoading(false); // Always set isLoading to false after attempt
       }
@@ -51,13 +47,9 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await api.post("/user/logout");
-      // After successful logout, clear user and redirect
-      setUser(null);
-      // Removed window.location.href = "/login" to allow react-router to handle it.
-      // PrivateRoute will automatically redirect to /login when user becomes null.
+    
     } catch (e) {
-      console.error("Logout failed:", e);
-      // Even if logout API call fails, assume local session is effectively ended
+     
       setUser(null);
     }
   };
